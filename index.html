@@ -82,6 +82,9 @@
     display:flex; flex-direction:column; gap:14px;
   }
 
+  #date-row{ display:flex; justify-content:flex-end; }
+  #today-date{ font-size:12px; font-weight:600; color:#8A8371; }
+
   .label{
     font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
     color:#8A8371; margin:0 0 6px 2px;
@@ -107,7 +110,19 @@
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
 
-  #buttons-row{
+  #quantity-fields{ display:flex; flex-direction:column; gap:14px; }
+
+  .qty-group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .qty-group-header .label{ margin:0; }
+
+  .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:#EDE8DC; border-radius:999px; padding:3px; }
+  .tab-btn{
+    border:none; background:transparent; color:#8A8371; font-size:13px; font-weight:700;
+    padding:6px 12px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  }
+  .tab-btn.active{ background:var(--ink); color:#fff; }
+
+  .buttons-row{
     display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch;
     padding:2px 2px 6px;
   }
@@ -158,6 +173,22 @@
     display:none; background:#FFF1E8; border:1.5px solid var(--accent); color:var(--accent-ink);
     border-radius:10px; padding:10px 12px; font-size:12.5px; line-height:1.5;
   }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(18,21,26,.55);
+    display:none; align-items:center; justify-content:center; z-index:200; padding:24px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-card{
+    background:#fff; border-radius:14px; padding:22px 20px; max-width:320px; width:100%;
+    text-align:center;
+  }
+  .modal-title{ font-size:16px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .modal-body{ font-size:14px; color:#5B5647; line-height:1.5; margin-bottom:18px; }
+  .modal-confirm-btn{
+    width:100%; border:none; border-radius:10px; background:var(--accent); color:#fff;
+    font-size:15px; font-weight:700; padding:12px; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -176,6 +207,8 @@
 
   <div id="input-section">
 
+    <div id="date-row"><span id="today-date"></span></div>
+
     <div id="config-warning">
       ⚠️ MS Forms 전송 URL이 아직 설정되지 않았습니다. index.html 상단의 <b>CONFIG.MS_FORMS_TEMPLATE_URL</b> 값을 README 안내에 따라 채워주세요.
     </div>
@@ -188,13 +221,10 @@
       </div>
     </div>
 
-    <div>
-      <div class="label label-lg">주문 수량</div>
-      <div id="buttons-row"></div>
-    </div>
+    <div id="quantity-fields"></div>
 
     <div>
-      <div class="label">비고 입력 (선택)1</div>
+      <div class="label">비고 입력 (선택)</div>
       <input id="text-input" type="text" placeholder="메모나 특이사항을 입력하세요" />
     </div>
 
@@ -211,8 +241,15 @@
 
 <div id="toast"></div>
 
-<script src="vendor/html5-qrcode.min.js"></script>
+<div id="offline-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">인터넷 연결 필요</div>
+    <div class="modal-body">인터넷에 연결되어 있지 않습니다.<br>인터넷이 되는 곳으로 이동한 후 확인을 눌러주세요.</div>
+    <button id="offline-modal-confirm" type="button" class="modal-confirm-btn">확인</button>
+  </div>
+</div>
 
+<script src="vendor/html5-qrcode.min.js"></script>
 <script>
 /* =========================================================
    설정 (CONFIG) — 이 블록만 수정하면 됩니다
@@ -221,46 +258,75 @@ const CONFIG = {
   // 1) Microsoft Forms에서 "미리 채워진 링크(Get Pre-filled link)"로 생성한 URL을 붙여넣으세요.
   //    링크를 만들 때 각 문항에는 아래 PLACEHOLDER 문자열을 그대로 입력해서 생성하면,
   //    이 코드가 문항 파라미터명을 몰라도 문자열 치환만으로 값을 채울 수 있습니다.
-  //    예) https://forms.office.com/pages/responsepage.aspx?id=xxxxxxxx&r1234=QR_VALUE_HERE&r5678=BUTTON_VALUE_HERE&r9012=TEXT_VALUE_HERE
-  MS_FORMS_TEMPLATE_URL: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=hTfGPKK40UG8RH2Kj_o9bnwRZnTmg9hAjZ0tvYsLBy9UOUlHNEJHVFM1MlpOSzMxUVU0ODZGS1RRUC4u&r4a28f38cdf1f41f99e4864aaa9ee2ba8=QR_VALUE_HERE&&rbd4498299293499181f6d7490da14e96=TEXT_VALUE_HERE&rdd4db81f726a452abe98d4b79795b3db=BUTTON_VALUE_HERE",
+  MS_FORMS_TEMPLATE_URL: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=hTfGPKK40UG8RH2Kj_o9bnwRZnTmg9hAjZ0tvYsLBy9UOUlHNEJHVFM1MlpOSzMxUVU0ODZGS1RRUC4u&r4a28f38cdf1f41f99e4864aaa9ee2ba8=QR_VALUE_HERE&&rbd4498299293499181f6d7490da14e96=ORDER_QTY_HERE&rdd4db81f726a452abe98d4b79795b3db=RECOVERY_QTY_HERE",
 
   PLACEHOLDER_QR: "QR_VALUE_HERE",
-  PLACEHOLDER_BUTTON: "BUTTON_VALUE_HERE",
   PLACEHOLDER_TEXT: "TEXT_VALUE_HERE",
 
   // 2) 전송 후 MS Forms를 새 탭으로 열지(true), 현재 화면에서 이동할지(false) 선택.
-  //    - true 추천: 스캐너 화면이 계속 살아있어 바로 다음 항목 스캔 가능 (Android에서 안정적)
-  //    - iOS 홈화면 앱(standalone)에서는 새 탭이 Safari로 튈 수 있어 false가 더 자연스러울 수 있음
-  OPEN_IN_NEW_TAB: false,
+  OPEN_IN_NEW_TAB: true,
 
-  // 안드로이드에서는 Chrome 대신 실제 기본 브라우저로 강제 이동
-  FORCE_DEFAULT_BROWSER_ON_ANDROID: true,  
+  // 2-1) 안드로이드에서는 Chrome Custom Tab을 거치지 않고 실제 기본 브라우저로 강제 이동
+  //      (Chrome Custom Tab이 MS Forms를 데스크톱형 레이아웃으로 렌더링하는 문제 회피용)
+  FORCE_DEFAULT_BROWSER_ON_ANDROID: true,
 
-  // 3) 하단 "주문 수량" 버튼(가로 스크롤 칩) 목록 — label(화면 표시), value(폼에 전달될 값)
-  //    기본값은 1~10을 자동 생성. 범위를 바꾸려면 10 대신 원하는 최대값을 넣으세요.
-  QUICK_BUTTONS: Array.from({ length: 10 }, (_, i) => ({ label: String(i + 1), value: String(i + 1) })),
+  // 3) 탭으로 묶어 하나의 입력 공간에서 여러 항목을 전환하며 입력받는 그룹.
+  //    각 tab의 값은 " / "로 이어붙여 하나의 MS Forms 문항(placeholder)에 전달됩니다.
+  //    예) Toner=3, Drum=5 선택 시 → "3 / 5" 로 전달 (비어있는 항목은 "0"으로 처리)
+   QUANTITY_TAB_GROUPS: [
+    {
+      key: "order",
+      label: "소모품 주문 수량",
+      placeholder: "ORDER_QTY_HERE",
+      tabs: [
+        { key: "tonerOrder", tabLabel: "Toner", max: 10 },
+        { key: "drumOrder", tabLabel: "Drum", max: 10 }
+      ]
+    },
+    {
+      key: "recovery",
+      label: "폐소모품 회수 수량",
+      placeholder: "RECOVERY_QTY_HERE",
+      tabs: [
+        { key: "tonerRecovery", tabLabel: "Toner", max: 10 },
+        { key: "drumRecovery", tabLabel: "Drum", max: 10 }
+      ]
+    }
+  ],
 
-  // 4) 주문 수량 선택을 필수로 만들지 여부
-  REQUIRE_BUTTON: false
+  // 4) 탭 없이 단독으로 표시되는 수량 항목 목록 (현재는 사용하는 항목 없음)
+  QUANTITY_FIELDS: [],
+
+  // 4) 탭 없이 단독으로 표시되는 수량 항목 목록
+//  QUANTITY_FIELDS: [
+//    { key: "tonerRecovery", label: "Toner 회수 수량", placeholder: "TONER_RECOVERY_HERE", max: 10 },
+//    { key: "drumRecovery", label: "Drum 회수 수량", placeholder: "DRUM_RECOVERY_HERE", max: 10 }
+//  ],
+
+  // 5) 위 수량 항목을 모두 선택해야 전송 버튼이 활성화되게 하려면 true
+  REQUIRE_ALL_QUANTITIES: false
 };
 /* ========================================================= */
 
 let scannedValue = "";
-let selectedButtonValue = "";
+const quantityState = {};
 let html5QrCode = null;
 let isPaused = false;
 
 const els = {
   scannedValue: document.getElementById('scanned-value'),
   scannedCard: document.getElementById('scanned-card'),
-  buttonsRow: document.getElementById('buttons-row'),
+  quantityFields: document.getElementById('quantity-fields'),
   textInput: document.getElementById('text-input'),
   submitBtn: document.getElementById('submit-btn'),
   rescanBtn: document.getElementById('rescan-btn'),
   clearScan: document.getElementById('clear-scan'),
   frameBox: document.getElementById('frame-box'),
   toast: document.getElementById('toast'),
-  configWarning: document.getElementById('config-warning')
+  configWarning: document.getElementById('config-warning'),
+  offlineModal: document.getElementById('offline-modal'),
+  offlineModalConfirm: document.getElementById('offline-modal-confirm'),
+  todayDate: document.getElementById('today-date')
 };
 
 function showToast(msg, ms = 2200) {
@@ -270,28 +336,129 @@ function showToast(msg, ms = 2200) {
   showToast._t = setTimeout(() => els.toast.classList.remove('show'), ms);
 }
 
-function renderButtons() {
-  els.buttonsRow.innerHTML = "";
-  CONFIG.QUICK_BUTTONS.forEach((b) => {
-    const el = document.createElement('button');
-    el.type = "button";
-    el.className = "quick-btn";
-    el.textContent = b.label;
-    el.addEventListener('click', () => {
-      const isSame = selectedButtonValue === b.value;
-      selectedButtonValue = isSame ? "" : b.value;
-      [...els.buttonsRow.children].forEach(c => c.classList.remove('selected'));
-      if (!isSame) el.classList.add('selected');
+function renderTodayDate() {
+  const now = new Date();
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  els.todayDate.textContent = `${y}.${m}.${d} (${days[now.getDay()]})`;
+}
+
+function renderTabGroup(group) {
+  group.tabs.forEach((t) => { quantityState[t.key] = ""; });
+  let activeIndex = 0;
+
+  const wrap = document.createElement('div');
+  const header = document.createElement('div');
+  header.className = 'qty-group-header';
+
+  const label = document.createElement('div');
+  label.className = 'label label-lg';
+  label.textContent = group.label;
+
+  const tabSwitch = document.createElement('div');
+  tabSwitch.className = 'tab-switch';
+
+  const row = document.createElement('div');
+  row.className = 'buttons-row';
+
+  function renderTabs() {
+    tabSwitch.innerHTML = "";
+    group.tabs.forEach((t, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tab-btn' + (idx === activeIndex ? ' active' : '');
+      btn.textContent = quantityState[t.key] ? `${t.tabLabel} · ${quantityState[t.key]}` : t.tabLabel;
+      btn.addEventListener('click', () => {
+        activeIndex = idx;
+        renderTabs();
+        renderRow();
+      });
+      tabSwitch.appendChild(btn);
+    });
+  }
+
+  function renderRow() {
+    const tab = group.tabs[activeIndex];
+    row.innerHTML = "";
+    const max = tab.max || 10;
+    for (let i = 1; i <= max; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'quick-btn';
+      btn.textContent = i;
+      if (quantityState[tab.key] === String(i)) btn.classList.add('selected');
+      btn.addEventListener('click', () => {
+        const val = String(i);
+        quantityState[tab.key] = (quantityState[tab.key] === val) ? "" : val;
+        renderTabs();
+        renderRow();
+        updateSubmitState();
+      });
+      row.appendChild(btn);
+    }
+  }
+
+  renderTabs();
+  renderRow();
+
+  header.appendChild(label);
+  header.appendChild(tabSwitch);
+  wrap.appendChild(header);
+  wrap.appendChild(row);
+  els.quantityFields.appendChild(wrap);
+}
+
+function renderSingleField(field) {
+  quantityState[field.key] = "";
+
+  const block = document.createElement('div');
+  const label = document.createElement('div');
+  label.className = 'label label-lg';
+  label.textContent = field.label;
+
+  const row = document.createElement('div');
+  row.className = 'buttons-row';
+
+  const max = field.max || 10;
+  for (let i = 1; i <= max; i++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'quick-btn';
+    btn.textContent = i;
+    btn.addEventListener('click', () => {
+      const val = String(i);
+      const isSame = quantityState[field.key] === val;
+      quantityState[field.key] = isSame ? "" : val;
+      [...row.children].forEach((c, idx) => c.classList.toggle('selected', !isSame && idx + 1 === i));
       updateSubmitState();
     });
-    els.buttonsRow.appendChild(el);
-  });
+    row.appendChild(btn);
+  }
+
+  block.appendChild(label);
+  block.appendChild(row);
+  els.quantityFields.appendChild(block);
+}
+
+function renderQuantityFields() {
+  els.quantityFields.innerHTML = "";
+  CONFIG.QUANTITY_TAB_GROUPS.forEach((group) => renderTabGroup(group));
+  CONFIG.QUANTITY_FIELDS.forEach((field) => renderSingleField(field));
+}
+
+function allQuantityKeys() {
+  const keys = CONFIG.QUANTITY_FIELDS.map((f) => f.key);
+  CONFIG.QUANTITY_TAB_GROUPS.forEach((g) => g.tabs.forEach((t) => keys.push(t.key)));
+  return keys;
 }
 
 function updateSubmitState() {
   const hasScan = !!scannedValue;
-  const hasButtonIfRequired = !CONFIG.REQUIRE_BUTTON || !!selectedButtonValue;
-  els.submitBtn.disabled = !(hasScan && hasButtonIfRequired);
+  const quantitiesOk = !CONFIG.REQUIRE_ALL_QUANTITIES ||
+    allQuantityKeys().every((k) => !!quantityState[k]);
+  els.submitBtn.disabled = !(hasScan && quantitiesOk);
 }
 
 function onScanSuccess(decodedText) {
@@ -308,13 +475,12 @@ function onScanSuccess(decodedText) {
 
 function resetScanState() {
   scannedValue = "";
-  selectedButtonValue = "";
   els.scannedValue.textContent = "QR 코드를 스캔하세요";
   els.scannedValue.classList.add('placeholder');
   els.scannedCard.classList.remove('filled');
   els.frameBox.classList.remove('found');
   els.textInput.value = "";
-  [...els.buttonsRow.children].forEach(c => c.classList.remove('selected'));
+  renderQuantityFields();
   updateSubmitState();
 }
 
@@ -347,12 +513,20 @@ function buildFormsUrl() {
   const textVal = els.textInput.value || "";
   let url = CONFIG.MS_FORMS_TEMPLATE_URL;
   url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(scannedValue));
-  url = url.split(CONFIG.PLACEHOLDER_BUTTON).join(encodeURIComponent(selectedButtonValue));
+
+  CONFIG.QUANTITY_FIELDS.forEach((f) => {
+    url = url.split(f.placeholder).join(encodeURIComponent(quantityState[f.key] || ""));
+  });
+
+  CONFIG.QUANTITY_TAB_GROUPS.forEach((g) => {
+    const combined = g.tabs.map((t) => quantityState[t.key] || "0").join(" / ");
+    url = url.split(g.placeholder).join(encodeURIComponent(combined));
+  });
+
   url = url.split(CONFIG.PLACEHOLDER_TEXT).join(encodeURIComponent(textVal));
   return url;
 }
 
-// 삼성 브라우저 기동을 위한 함수 2개 추가
 function isAndroid() {
   return /Android/i.test(navigator.userAgent);
 }
@@ -361,32 +535,20 @@ function buildAndroidIntentUrl(httpsUrl) {
   const withoutScheme = httpsUrl.replace(/^https:\/\//, '');
   return 'intent://' + withoutScheme + '#Intent;scheme=https;action=android.intent.action.VIEW;end';
 }
-/*
-function handleSubmit() {
-  if (!scannedValue) return;
-  if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
-    showToast("MS Forms URL이 설정되지 않았습니다 (README 참고)", 3500);
-    return;
-  }
-  const url = buildFormsUrl();
-  if (CONFIG.OPEN_IN_NEW_TAB) {
-    window.open(url, '_blank');
-  } else {
-    window.location.href = url;
-  }
-  showToast("전송되었습니다. 폼 화면에서 제출을 눌러주세요.");
-  resetScanState();
-  resumeScanner();
-}
-*/
 
-//handleSubmit() 함수 교환
-function handleSubmit() {
-  if (!scannedValue) return;
-  if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
-    showToast("MS Forms URL이 설정되지 않았습니다 (README 참고)", 3500);
-    return;
-  }
+function isOnline() {
+  return navigator.onLine;
+}
+
+function showOfflineModal() {
+  els.offlineModal.classList.add('show');
+}
+
+function hideOfflineModal() {
+  els.offlineModal.classList.remove('show');
+}
+
+function proceedToForms() {
   const url = buildFormsUrl();
 
   if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
@@ -402,9 +564,31 @@ function handleSubmit() {
   resumeScanner();
 }
 
+function handleSubmit() {
+  if (!scannedValue) return;
+  if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
+    showToast("MS Forms URL이 설정되지 않았습니다 (README 참고)", 3500);
+    return;
+  }
+  if (!isOnline()) {
+    showOfflineModal();
+    return;
+  }
+  proceedToForms();
+}
+
 els.submitBtn.addEventListener('click', handleSubmit);
 els.rescanBtn.addEventListener('click', () => { resetScanState(); resumeScanner(); });
 els.clearScan.addEventListener('click', () => { resetScanState(); resumeScanner(); });
+
+els.offlineModalConfirm.addEventListener('click', () => {
+  if (!isOnline()) {
+    showToast("아직 인터넷에 연결되어 있지 않습니다.", 2000);
+    return;
+  }
+  hideOfflineModal();
+  proceedToForms();
+});
 
 // 새 탭에서 돌아왔을 때(iOS 등) 카메라가 멈춰 있으면 재개
 document.addEventListener('visibilitychange', () => {
@@ -415,7 +599,9 @@ window.addEventListener('load', () => {
   if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
     els.configWarning.style.display = 'block';
   }
-  renderButtons();
+  renderTodayDate();
+  setInterval(renderTodayDate, 60000);
+  renderQuantityFields();
   updateSubmitState();
   startScanner();
 
