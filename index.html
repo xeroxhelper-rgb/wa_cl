@@ -233,6 +233,9 @@ const CONFIG = {
   //    - iOS 홈화면 앱(standalone)에서는 새 탭이 Safari로 튈 수 있어 false가 더 자연스러울 수 있음
   OPEN_IN_NEW_TAB: false,
 
+  // 안드로이드에서는 Chrome 대신 실제 기본 브라우저로 강제 이동
+  FORCE_DEFAULT_BROWSER_ON_ANDROID: true,  
+
   // 3) 하단 "주문 수량" 버튼(가로 스크롤 칩) 목록 — label(화면 표시), value(폼에 전달될 값)
   //    기본값은 1~10을 자동 생성. 범위를 바꾸려면 10 대신 원하는 최대값을 넣으세요.
   QUICK_BUTTONS: Array.from({ length: 10 }, (_, i) => ({ label: String(i + 1), value: String(i + 1) })),
@@ -349,6 +352,16 @@ function buildFormsUrl() {
   return url;
 }
 
+// 삼성 브라우저 기동을 위한 함수 2개 추가
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function buildAndroidIntentUrl(httpsUrl) {
+  const withoutScheme = httpsUrl.replace(/^https:\/\//, '');
+  return 'intent://' + withoutScheme + '#Intent;scheme=https;action=android.intent.action.VIEW;end';
+}
+/*
 function handleSubmit() {
   if (!scannedValue) return;
   if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
@@ -361,6 +374,29 @@ function handleSubmit() {
   } else {
     window.location.href = url;
   }
+  showToast("전송되었습니다. 폼 화면에서 제출을 눌러주세요.");
+  resetScanState();
+  resumeScanner();
+}
+*/
+
+//handleSubmit() 함수 교환
+function handleSubmit() {
+  if (!scannedValue) return;
+  if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
+    showToast("MS Forms URL이 설정되지 않았습니다 (README 참고)", 3500);
+    return;
+  }
+  const url = buildFormsUrl();
+
+  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
+    window.location.href = buildAndroidIntentUrl(url);
+  } else if (CONFIG.OPEN_IN_NEW_TAB) {
+    window.open(url, '_blank');
+  } else {
+    window.location.href = url;
+  }
+
   showToast("전송되었습니다. 폼 화면에서 제출을 눌러주세요.");
   resetScanState();
   resumeScanner();
