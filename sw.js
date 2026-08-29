@@ -1,10 +1,11 @@
-const CACHE_NAME = 'qr-msforms-shell-v1';
+const CACHE_NAME = 'qr-msforms-shell-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/vendor/html5-qrcode.min.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -23,11 +24,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 앱 셸(HTML/CSS/JS/아이콘)만 캐시 우선으로 서빙합니다.
-// 카메라 스캔 라이브러리(CDN)와 MS Forms 제출은 항상 네트워크가 필요합니다 — 완전한 오프라인 동작은 지원하지 않습니다.
+// Stale-while-revalidate 전략:
+// 1) 캐시에 있으면 즉시 캐시로 응답해서 지금처럼 빠르게 열립니다.
+// 2) 동시에 네트워크로 최신 버전을 요청해서 캐시를 갱신합니다 (Vercel에 새 배포가 있으면 다음에 열 때 반영됨).
+// 3) 오프라인이라 네트워크 요청이 실패하면 조용히 무시하고 캐시 응답을 그대로 씁니다 → 인터넷이 막혀도 카메라 스캔 라이브러리(vendor/html5-qrcode.min.js) 포함 앱 전체가 동작합니다.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.match(event.request).then((cachedResponse) => {
+        const networkFetch = fetch(event.request, { cache: 'no-store' })
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse); // 오프라인 등 네트워크 실패 시 캐시로 폴백
+
+        return cachedResponse || networkFetch;
+      })
+    )
   );
 });
