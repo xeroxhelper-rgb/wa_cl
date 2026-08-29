@@ -86,6 +86,10 @@
     font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
     color:#8A8371; margin:0 0 6px 2px;
   }
+  .label.label-lg{
+    font-size:17px; font-weight:700; letter-spacing:0; text-transform:none;
+    color:var(--ink); margin:0 0 8px 2px;
+  }
 
   #scanned-card{
     border:1.5px solid var(--line); background:#fff; border-radius:10px;
@@ -103,10 +107,15 @@
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
 
-  #buttons-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  #buttons-row{
+    display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    padding:2px 2px 6px;
+  }
   .quick-btn{
+    flex:0 0 auto; width:48px; height:48px; padding:0;
     border:1.5px solid var(--line); background:#fff; color:var(--ink);
-    padding:9px 16px; border-radius:999px; font-size:14px; font-weight:600;
+    border-radius:50%; font-size:16px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
     cursor:pointer; user-select:none;
   }
   .quick-btn.selected{ background:var(--ink); border-color:var(--ink); color:#fff; }
@@ -119,8 +128,10 @@
 
   .spacer{ flex:1 1 auto; }
 
+  #action-row{ display:flex; gap:8px; }
+
   #submit-btn{
-    flex:0 0 auto; width:100%; border:none; border-radius:12px;
+    flex:1 1 auto; border:none; border-radius:12px;
     background:var(--accent); color:#fff; font-size:16px; font-weight:700;
     padding:16px; cursor:pointer; letter-spacing:.01em;
     transition:opacity .15s ease, transform .1s ease;
@@ -129,8 +140,8 @@
   #submit-btn:disabled{ background:#D8D2C4; color:#A39C89; cursor:not-allowed; }
 
   #rescan-btn{
-    flex:0 0 auto; width:100%; border:1.5px solid var(--line); background:transparent;
-    color:var(--ink); font-size:14px; font-weight:600; padding:11px; border-radius:12px;
+    flex:0 0 110px; border:1.5px solid var(--line); background:transparent;
+    color:var(--ink); font-size:14px; font-weight:600; padding:11px 6px; border-radius:12px;
     cursor:pointer;
   }
 
@@ -178,19 +189,21 @@
     </div>
 
     <div>
-      <div class="label">구분 선택</div>
+      <div class="label label-lg">주문 수량</div>
       <div id="buttons-row"></div>
     </div>
 
     <div>
-      <div class="label">비고 입력 (선택)</div>
+      <div class="label">비고 입력 (선택)1</div>
       <input id="text-input" type="text" placeholder="메모나 특이사항을 입력하세요" />
     </div>
 
     <div class="spacer"></div>
 
-    <button id="rescan-btn" type="button">다시 스캔</button>
-    <button id="submit-btn" type="button" disabled>MS Forms로 전송</button>
+    <div id="action-row">
+      <button id="rescan-btn" type="button">다시 스캔</button>
+      <button id="submit-btn" type="button" disabled>MS Forms로 전송</button>
+    </div>
 
   </div>
 
@@ -219,14 +232,11 @@ const CONFIG = {
   //    - iOS 홈화면 앱(standalone)에서는 새 탭이 Safari로 튈 수 있어 false가 더 자연스러울 수 있음
   OPEN_IN_NEW_TAB: true,
 
-  // 3) 하단 "구분 선택" 버튼 목록 — label(화면 표시), value(폼에 전달될 값)
-  QUICK_BUTTONS: [
-    { label: "정상", value: "정상" },
-    { label: "이상", value: "이상" },
-    { label: "확인필요", value: "확인필요" }
-  ],
+  // 3) 하단 "주문 수량" 버튼(가로 스크롤 칩) 목록 — label(화면 표시), value(폼에 전달될 값)
+  //    기본값은 1~10을 자동 생성. 범위를 바꾸려면 10 대신 원하는 최대값을 넣으세요.
+  QUICK_BUTTONS: Array.from({ length: 10 }, (_, i) => ({ label: String(i + 1), value: String(i + 1) })),
 
-  // 4) 구분 선택 버튼을 필수로 만들지 여부
+  // 4) 주문 수량 선택을 필수로 만들지 여부
   REQUIRE_BUTTON: false
 };
 /* ========================================================= */
