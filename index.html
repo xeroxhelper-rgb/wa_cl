@@ -72,6 +72,13 @@
     text-transform:uppercase; opacity:.75; font-weight:600;
   }
 
+  #settings-btn{
+    position:absolute; top:10px; right:12px; z-index:10;
+    width:32px; height:32px; border-radius:50%; border:none;
+    background:rgba(0,0,0,.45); color:#fff; font-size:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+
   /* ---------- 하단: 입력 영역 ---------- */
   #input-section{
     flex:1 1 auto;
@@ -84,7 +91,10 @@
 
   .label-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
   .label-row .label{ margin:0; }
-  #today-date{ font-size:12px; font-weight:600; color:#8A8371; }
+  #today-date{
+    font-size:12px; font-weight:600; color:#8A8371;
+    border:none; background:none; padding:2px 0; cursor:pointer;
+  }
 
   .label{
     font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
@@ -192,10 +202,30 @@
   }
   .modal-title{ font-size:16px; font-weight:700; color:var(--ink); margin-bottom:8px; }
   .modal-body{ font-size:14px; color:#5B5647; line-height:1.5; margin-bottom:18px; }
+  .modal-card input{
+    width:100%; border:1.5px solid var(--line); border-radius:10px;
+    padding:10px 12px; font-size:15px; text-align:center; margin-bottom:14px;
+    font-family:var(--sans); color:var(--ink);
+  }
+  .modal-card input:focus{ outline:none; border-color:var(--ink); }
   .modal-confirm-btn{
     width:100%; border:none; border-radius:10px; background:var(--accent); color:#fff;
     font-size:15px; font-weight:700; padding:12px; cursor:pointer;
   }
+
+  .history-card{ max-width:340px; max-height:80vh; display:flex; flex-direction:column; }
+  #history-list{ overflow-y:auto; max-height:50vh; margin:4px 0 16px; text-align:left; }
+  .history-item{
+    padding:10px 0; border-bottom:1px solid var(--line);
+    display:flex; gap:10px; align-items:flex-start;
+  }
+  .history-item:last-child{ border-bottom:none; }
+  .history-time{
+    flex:0 0 auto; font-family:var(--mono); font-size:13px; font-weight:700;
+    color:var(--ink); padding-top:1px;
+  }
+  .history-detail{ flex:1 1 auto; font-size:13px; color:#5B5647; line-height:1.5; word-break:break-all; }
+  .history-empty{ text-align:center; color:#8A8371; font-size:14px; padding:20px 0; }
 </style>
 </head>
 <body>
@@ -210,6 +240,7 @@
         <div class="corner bl"></div><div class="corner br"></div>
       </div>
     </div>
+    <button id="settings-btn" type="button" aria-label="설정">⚙</button>
   </div>
 
   <div id="input-section">
@@ -221,7 +252,7 @@
     <div id="scanned-block">
       <div class="label-row">
         <div class="label">스캔된 값</div>
-        <span id="today-date"></span>
+        <button id="today-date" type="button"></button>
       </div>
       <div id="scanned-card">
         <span id="scanned-value" class="placeholder">QR 코드를 스캔하세요</span>
@@ -254,6 +285,23 @@
     <div class="modal-title">인터넷 연결 필요</div>
     <div class="modal-body">인터넷에 연결되어 있지 않습니다.<br>인터넷이 되는 곳으로 이동한 후 확인을 눌러주세요.</div>
     <button id="offline-modal-confirm" type="button" class="modal-confirm-btn">확인</button>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">내 전화번호 등록</div>
+    <div class="modal-body">전송 시 QR 스캔 값과 함께 전달되어 담당자를 구분하는 데 사용됩니다.</div>
+    <input id="phone-input" type="tel" placeholder="010-1234-5678" />
+    <button id="settings-save-btn" type="button" class="modal-confirm-btn">저장</button>
+  </div>
+</div>
+
+<div id="history-modal" class="modal-overlay">
+  <div class="modal-card history-card">
+    <div class="modal-title">오늘 전송 내역</div>
+    <div id="history-list"></div>
+    <button id="history-close-btn" type="button" class="modal-confirm-btn">닫기</button>
   </div>
 </div>
 
@@ -328,7 +376,14 @@ const els = {
   configWarning: document.getElementById('config-warning'),
   offlineModal: document.getElementById('offline-modal'),
   offlineModalConfirm: document.getElementById('offline-modal-confirm'),
-  todayDate: document.getElementById('today-date')
+  todayDate: document.getElementById('today-date'),
+  settingsBtn: document.getElementById('settings-btn'),
+  settingsModal: document.getElementById('settings-modal'),
+  phoneInput: document.getElementById('phone-input'),
+  settingsSaveBtn: document.getElementById('settings-save-btn'),
+  historyModal: document.getElementById('history-modal'),
+  historyList: document.getElementById('history-list'),
+  historyCloseBtn: document.getElementById('history-close-btn')
 };
 
 function showToast(msg, ms = 2200) {
@@ -338,13 +393,109 @@ function showToast(msg, ms = 2200) {
   showToast._t = setTimeout(() => els.toast.classList.remove('show'), ms);
 }
 
+const HISTORY_KEY = 'qrMsforms.history';
+const PHONE_KEY = 'qrMsforms.phone';
+
+function todayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (parsed.date !== todayKey()) return []; // 날짜가 바뀌면 새로 시작
+    return parsed.entries || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveHistory(entries) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify({ date: todayKey(), entries }));
+  } catch (e) {}
+}
+
+function buildHistorySummary() {
+  const parts = [];
+  CONFIG.QUANTITY_TAB_GROUPS.forEach((g) => {
+    const combined = g.tabs.map((t) => quantityState[t.key] || '0').join('/');
+    parts.push(`${g.label} ${combined}`);
+  });
+  CONFIG.QUANTITY_FIELDS.forEach((f) => {
+    parts.push(`${f.label} ${quantityState[f.key] || '0'}`);
+  });
+  return parts.join(' · ');
+}
+
+function recordHistoryEntry() {
+  const entries = loadHistory();
+  entries.push({
+    time: new Date().toISOString(),
+    qr: scannedValue,
+    summary: buildHistorySummary(),
+    note: els.textInput.value || ''
+  });
+  saveHistory(entries);
+}
+
+function formatTime(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function getRegisteredPhone() {
+  try { return localStorage.getItem(PHONE_KEY) || ""; } catch (e) { return ""; }
+}
+
+function setRegisteredPhone(v) {
+  try { localStorage.setItem(PHONE_KEY, v); } catch (e) {}
+}
+
+function openSettingsModal() {
+  els.phoneInput.value = getRegisteredPhone();
+  els.settingsModal.classList.add('show');
+}
+
+function closeSettingsModal() {
+  els.settingsModal.classList.remove('show');
+}
+
+function openHistoryModal() {
+  const entries = loadHistory();
+  els.historyList.innerHTML = "";
+  if (entries.length === 0) {
+    els.historyList.innerHTML = '<div class="history-empty">오늘 전송한 내역이 없습니다.</div>';
+  } else {
+    entries.slice().reverse().forEach((e) => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      const noteHtml = e.note ? ` · ${escapeHtml(e.note)}` : '';
+      item.innerHTML = `<div class="history-time">${formatTime(e.time)}</div><div class="history-detail">${escapeHtml(e.qr)}<br>${escapeHtml(e.summary)}${noteHtml}</div>`;
+      els.historyList.appendChild(item);
+    });
+  }
+  els.historyModal.classList.add('show');
+}
+
+function closeHistoryModal() {
+  els.historyModal.classList.remove('show');
+}
+
 function renderTodayDate() {
   const now = new Date();
   const days = ['일', '월', '화', '수', '목', '금', '토'];
-  const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
-  els.todayDate.textContent = `${y}.${m}.${d} (${days[now.getDay()]})`;
+  const count = loadHistory().length;
+  els.todayDate.textContent = `${m}.${d}(${days[now.getDay()]}) · 오늘 ${count}건`;
 }
 
 function renderTabGroup(group) {
@@ -513,8 +664,11 @@ function startScanner() {
 
 function buildFormsUrl() {
   const textVal = els.textInput.value || "";
+  const phone = getRegisteredPhone();
+  const qrCombined = phone ? `${scannedValue} / ${phone}` : scannedValue;
+
   let url = CONFIG.MS_FORMS_TEMPLATE_URL;
-  url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(scannedValue));
+  url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(qrCombined));
 
   CONFIG.QUANTITY_FIELDS.forEach((f) => {
     url = url.split(f.placeholder).join(encodeURIComponent(quantityState[f.key] || ""));
@@ -552,6 +706,7 @@ function hideOfflineModal() {
 
 function proceedToForms() {
   const url = buildFormsUrl();
+  recordHistoryEntry();
 
 //  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
 //    window.location.href = buildAndroidIntentUrl(url);
@@ -565,6 +720,7 @@ function proceedToForms() {
   showToast("전송되었습니다. 폼 화면에서 제출을 눌러주세요.");
   resetScanState();
   resumeScanner();
+  renderTodayDate();
 }
 
 function handleSubmit() {
@@ -593,6 +749,22 @@ els.offlineModalConfirm.addEventListener('click', () => {
   proceedToForms();
 });
 
+els.settingsBtn.addEventListener('click', openSettingsModal);
+els.settingsSaveBtn.addEventListener('click', () => {
+  setRegisteredPhone(els.phoneInput.value.trim());
+  closeSettingsModal();
+  showToast('전화번호가 저장되었습니다.');
+});
+els.settingsModal.addEventListener('click', (e) => {
+  if (e.target === els.settingsModal) closeSettingsModal();
+});
+
+els.todayDate.addEventListener('click', openHistoryModal);
+els.historyCloseBtn.addEventListener('click', closeHistoryModal);
+els.historyModal.addEventListener('click', (e) => {
+  if (e.target === els.historyModal) closeHistoryModal();
+});
+
 // 새 탭에서 돌아왔을 때(iOS 등) 카메라가 멈춰 있으면 재개
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') resumeScanner();
@@ -607,6 +779,10 @@ window.addEventListener('load', () => {
   renderQuantityFields();
   updateSubmitState();
   startScanner();
+
+  if (!getRegisteredPhone()) {
+    openSettingsModal();
+  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
