@@ -553,9 +553,10 @@ function hideOfflineModal() {
 function proceedToForms() {
   const url = buildFormsUrl();
 
-  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
-    window.location.href = buildAndroidIntentUrl(url);
-  } else if (CONFIG.OPEN_IN_NEW_TAB) {
+//  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
+//    window.location.href = buildAndroidIntentUrl(url);
+//  } else if (CONFIG.OPEN_IN_NEW_TAB) {
+  if (CONFIG.OPEN_IN_NEW_TAB) {
     window.open(url, '_blank');
   } else {
     window.location.href = url;
