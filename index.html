@@ -39,7 +39,7 @@
   /* ---------- 상단: 카메라 스캔 영역 ---------- */
   #scan-section{
     position:relative;
-    flex:0 0 44%;
+    flex:0 0 38%;
     background:#000;
     overflow:hidden;
   }
@@ -78,25 +78,32 @@
     background:var(--paper);
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
-    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
-    display:flex; flex-direction:column; gap:14px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:10px;
   }
 
-  #date-row{ display:flex; justify-content:flex-end; }
+  .label-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .label-row .label{ margin:0; }
   #today-date{ font-size:12px; font-weight:600; color:#8A8371; }
 
   .label{
     font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-    color:#8A8371; margin:0 0 6px 2px;
+    color:#8A8371; margin:0 0 4px 2px;
   }
   .label.label-lg{
-    font-size:17px; font-weight:700; letter-spacing:0; text-transform:none;
-    color:var(--ink); margin:0 0 8px 2px;
+    font-size:16px; font-weight:700; letter-spacing:0; text-transform:none;
+    color:var(--ink); margin:0 0 6px 2px;
+  }
+
+  #scanned-block{
+    position:sticky; top:0; z-index:5;
+    background:var(--paper);
+    padding-top:2px; padding-bottom:4px;
   }
 
   #scanned-card{
     border:1.5px solid var(--line); background:#fff; border-radius:10px;
-    padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
   }
   #scanned-card.filled{ border-color:var(--ok); background:#F1FAF3; }
   #scanned-value{
@@ -110,26 +117,26 @@
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
 
-  #quantity-fields{ display:flex; flex-direction:column; gap:14px; }
+  #quantity-fields{ display:flex; flex-direction:column; gap:10px; }
 
-  .qty-group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .qty-group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
   .qty-group-header .label{ margin:0; }
 
   .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:#EDE8DC; border-radius:999px; padding:3px; }
   .tab-btn{
-    border:none; background:transparent; color:#8A8371; font-size:13px; font-weight:700;
-    padding:6px 12px; border-radius:999px; cursor:pointer; white-space:nowrap;
+    border:none; background:transparent; color:#8A8371; font-size:12px; font-weight:700;
+    padding:5px 10px; border-radius:999px; cursor:pointer; white-space:nowrap;
   }
   .tab-btn.active{ background:var(--ink); color:#fff; }
 
   .buttons-row{
-    display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch;
-    padding:2px 2px 6px;
+    display:flex; gap:7px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    padding:2px 2px 4px;
   }
   .quick-btn{
-    flex:0 0 auto; width:48px; height:48px; padding:0;
+    flex:0 0 auto; width:42px; height:42px; padding:0;
     border:1.5px solid var(--line); background:#fff; color:var(--ink);
-    border-radius:50%; font-size:16px; font-weight:700;
+    border-radius:50%; font-size:15px; font-weight:700;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; user-select:none;
   }
@@ -137,7 +144,7 @@
 
   #text-input{
     width:100%; border:1.5px solid var(--line); background:#fff; border-radius:10px;
-    padding:12px 14px; font-size:15px; font-family:var(--sans); color:var(--ink);
+    padding:10px 12px; font-size:15px; font-family:var(--sans); color:var(--ink);
   }
   #text-input:focus{ outline:none; border-color:var(--ink); }
 
@@ -148,7 +155,7 @@
   #submit-btn{
     flex:1 1 auto; border:none; border-radius:12px;
     background:var(--accent); color:#fff; font-size:16px; font-weight:700;
-    padding:16px; cursor:pointer; letter-spacing:.01em;
+    padding:13px; cursor:pointer; letter-spacing:.01em;
     transition:opacity .15s ease, transform .1s ease;
   }
   #submit-btn:active{ transform:scale(.98); }
@@ -156,7 +163,7 @@
 
   #rescan-btn{
     flex:0 0 110px; border:1.5px solid var(--line); background:transparent;
-    color:var(--ink); font-size:14px; font-weight:600; padding:11px 6px; border-radius:12px;
+    color:var(--ink); font-size:14px; font-weight:600; padding:9px 6px; border-radius:12px;
     cursor:pointer;
   }
 
@@ -207,14 +214,15 @@
 
   <div id="input-section">
 
-    <div id="date-row"><span id="today-date"></span></div>
-
     <div id="config-warning">
       ⚠️ MS Forms 전송 URL이 아직 설정되지 않았습니다. index.html 상단의 <b>CONFIG.MS_FORMS_TEMPLATE_URL</b> 값을 README 안내에 따라 채워주세요.
     </div>
 
-    <div>
-      <div class="label">스캔된 값</div>
+    <div id="scanned-block">
+      <div class="label-row">
+        <div class="label">스캔된 값</div>
+        <span id="today-date"></span>
+      </div>
       <div id="scanned-card">
         <span id="scanned-value" class="placeholder">QR 코드를 스캔하세요</span>
         <button id="clear-scan" title="지우기">✕</button>
@@ -273,7 +281,7 @@ const CONFIG = {
   // 3) 탭으로 묶어 하나의 입력 공간에서 여러 항목을 전환하며 입력받는 그룹.
   //    각 tab의 값은 " / "로 이어붙여 하나의 MS Forms 문항(placeholder)에 전달됩니다.
   //    예) Toner=3, Drum=5 선택 시 → "3 / 5" 로 전달 (비어있는 항목은 "0"으로 처리)
-   QUANTITY_TAB_GROUPS: [
+  QUANTITY_TAB_GROUPS: [
     {
       key: "order",
       label: "소모품 주문 수량",
@@ -296,12 +304,6 @@ const CONFIG = {
 
   // 4) 탭 없이 단독으로 표시되는 수량 항목 목록 (현재는 사용하는 항목 없음)
   QUANTITY_FIELDS: [],
-
-  // 4) 탭 없이 단독으로 표시되는 수량 항목 목록
-//  QUANTITY_FIELDS: [
-//    { key: "tonerRecovery", label: "Toner 회수 수량", placeholder: "TONER_RECOVERY_HERE", max: 10 },
-//    { key: "drumRecovery", label: "Drum 회수 수량", placeholder: "DRUM_RECOVERY_HERE", max: 10 }
-//  ],
 
   // 5) 위 수량 항목을 모두 선택해야 전송 버튼이 활성화되게 하려면 true
   REQUIRE_ALL_QUANTITIES: false
