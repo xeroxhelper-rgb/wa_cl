@@ -74,9 +74,10 @@
 
   #settings-btn{
     position:absolute; top:10px; right:12px; z-index:10;
-    width:32px; height:32px; border-radius:50%; border:none;
-    background:rgba(0,0,0,.45); color:#fff; font-size:16px;
+    width:30px; height:30px; border-radius:50%; border:none;
+    background:rgba(255,255,255,.18); color:#fff; font-size:15px;
     display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+    text-shadow:0 1px 2px rgba(0,0,0,.5);
   }
 
   /* ---------- 하단: 입력 영역 ---------- */
@@ -129,15 +130,25 @@
 
   #quantity-fields{ display:flex; flex-direction:column; gap:10px; }
 
+  .qty-group{ --group-accent: var(--ink); --group-bg: transparent; }
   .qty-group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
-  .qty-group-header .label{ margin:0; }
-
-  .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:#EDE8DC; border-radius:999px; padding:3px; }
-  .tab-btn{
-    border:none; background:transparent; color:#8A8371; font-size:12px; font-weight:700;
-    padding:5px 10px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  .qty-group-header .label{
+    margin:0; color:var(--group-accent); background:var(--group-bg);
+    padding:4px 10px; border-radius:8px;
   }
-  .tab-btn.active{ background:var(--ink); color:#fff; }
+
+  .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:#EDE8DC; border-radius:999px; padding:4px; }
+  .tab-btn{
+    border:none; background:transparent; color:#8A8371; font-size:16px; font-weight:700;
+    padding:6px 14px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  }
+  .tab-btn.active{ background:var(--group-accent); color:#fff; }
+
+  .group-arrow{
+    display:flex; justify-content:center; align-items:center;
+    color:var(--ink); opacity:.4; margin:-3px 0;
+  }
+  .group-arrow svg{ display:block; }
 
   .buttons-row{
     display:flex; gap:7px; overflow-x:auto; -webkit-overflow-scrolling:touch;
@@ -334,6 +345,8 @@ const CONFIG = {
       key: "order",
       label: "소모품 주문 수량",
       placeholder: "ORDER_QTY_HERE",
+      accentColor: "#1F3A5F",
+      bgColor: "#E6ECF4",
       tabs: [
         { key: "tonerOrder", tabLabel: "Toner", max: 10 },
         { key: "drumOrder", tabLabel: "Drum", max: 10 }
@@ -343,6 +356,8 @@ const CONFIG = {
       key: "recovery",
       label: "폐소모품 회수 수량",
       placeholder: "RECOVERY_QTY_HERE",
+      accentColor: "var(--accent)",
+      bgColor: "#FFE9DE",
       tabs: [
         { key: "tonerRecovery", tabLabel: "Toner", max: 10 },
         { key: "drumRecovery", tabLabel: "Drum", max: 10 }
@@ -503,6 +518,10 @@ function renderTabGroup(group) {
   let activeIndex = 0;
 
   const wrap = document.createElement('div');
+  wrap.className = 'qty-group';
+  wrap.style.setProperty('--group-accent', group.accentColor || 'var(--ink)');
+  wrap.style.setProperty('--group-bg', group.bgColor || 'transparent');
+
   const header = document.createElement('div');
   header.className = 'qty-group-header';
 
@@ -597,7 +616,15 @@ function renderSingleField(field) {
 
 function renderQuantityFields() {
   els.quantityFields.innerHTML = "";
-  CONFIG.QUANTITY_TAB_GROUPS.forEach((group) => renderTabGroup(group));
+  CONFIG.QUANTITY_TAB_GROUPS.forEach((group, idx) => {
+    renderTabGroup(group);
+    if (idx < CONFIG.QUANTITY_TAB_GROUPS.length - 1) {
+      const arrow = document.createElement('div');
+      arrow.className = 'group-arrow';
+      arrow.innerHTML = '<svg width="48" height="14" viewBox="0 0 48 14" xmlns="http://www.w3.org/2000/svg"><polygon points="2,2 46,2 24,12" fill="currentColor"/></svg>';
+      els.quantityFields.appendChild(arrow);
+    }
+  });
   CONFIG.QUANTITY_FIELDS.forEach((field) => renderSingleField(field));
 }
 
