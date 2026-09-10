@@ -222,27 +222,6 @@
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
 
-  /* OCR 인식 필드 세부 카드 */
-  #ocr-fields-card{
-    display:none;
-    border:1.5px solid #a8ddc0; background:#f0faf5; border-radius:10px;
-    padding:10px 12px; gap:6px; flex-direction:column;
-  }
-  #ocr-fields-card.show{ display:flex; }
-  .ocr-field-row{
-    display:flex; align-items:center; gap:8px; font-size:13px;
-  }
-  .ocr-field-key{
-    flex:0 0 auto; min-width:90px;
-    font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-    color:#1a7a4a; background:#d4f0e2; padding:2px 7px; border-radius:6px;
-  }
-  .ocr-field-val{
-    font-family:var(--mono); font-weight:600; color:var(--ink); font-size:13px;
-    word-break:break-all;
-  }
-  .ocr-field-val.missing{ color:var(--muted-soft); font-style:italic; font-family:var(--sans); }
-
   #quantity-fields{ display:flex; flex-direction:column; gap:10px; }
 
   .qty-group{ --group-accent: var(--ink); --group-bg: transparent; --group-label-color: var(--ink); }
@@ -423,34 +402,6 @@
       </div>
     </div>
 
-    <!-- OCR 인식 필드 세부 표시 -->
-    <div id="ocr-fields-card">
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">주문번호</span>
-        <span class="ocr-field-val missing" id="ocr-f-order">—</span>
-      </div>
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">고객명</span>
-        <span class="ocr-field-val missing" id="ocr-f-customer">—</span>
-      </div>
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">고객번호</span>
-        <span class="ocr-field-val missing" id="ocr-f-custno">—</span>
-      </div>
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">Sub Inventory</span>
-        <span class="ocr-field-val missing" id="ocr-f-subinv">—</span>
-      </div>
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">Item Code</span>
-        <span class="ocr-field-val missing" id="ocr-f-item">—</span>
-      </div>
-      <div class="ocr-field-row">
-        <span class="ocr-field-key">Qty</span>
-        <span class="ocr-field-val missing" id="ocr-f-qty">—</span>
-      </div>
-    </div>
-
     <div id="quantity-fields"></div>
 
     <div>
@@ -622,13 +573,6 @@ const els = {
   ocrCanvas: document.getElementById('ocr-canvas'),
   ocrStatusBadge: document.getElementById('ocr-status-badge'),
   ocrStatusText: document.getElementById('ocr-status-text'),
-  ocrFieldsCard: document.getElementById('ocr-fields-card'),
-  ocrFOrder: document.getElementById('ocr-f-order'),
-  ocrFCustomer: document.getElementById('ocr-f-customer'),
-  ocrFCustno: document.getElementById('ocr-f-custno'),
-  ocrFSubinv: document.getElementById('ocr-f-subinv'),
-  ocrFItem: document.getElementById('ocr-f-item'),
-  ocrFQty: document.getElementById('ocr-f-qty'),
   reader: document.getElementById('reader'),
 };
 
@@ -945,10 +889,6 @@ function resetScanState() {
   els.frameBox.classList.remove('found', 'ocr-found');
   els.textInput.value = "";
 
-  // OCR 필드 초기화
-  resetOcrFieldDisplay();
-  els.ocrFieldsCard.classList.remove('show');
-
   renderQuantityFields();
   updateSubmitState();
 }
@@ -981,15 +921,17 @@ function startScanner() {
 function stopQrScanner() {
   return new Promise((resolve) => {
     if (html5QrCode) {
-      html5QrCode.stop().then(() => {
+      let resolved = false;
+      const doResolve = () => {
+        if (resolved) return;
+        resolved = true;
         html5QrCode = null;
         isPaused = false;
         resolve();
-      }).catch(() => {
-        html5QrCode = null;
-        isPaused = false;
-        resolve();
-      });
+      };
+      // Prevent hanging on stop()
+      setTimeout(doResolve, 500);
+      html5QrCode.stop().then(doResolve).catch(doResolve);
     } else {
       resolve();
     }
@@ -999,38 +941,24 @@ function stopQrScanner() {
 /* ============================================================
    OCR 모드
    ============================================================ */
-function resetOcrFieldDisplay() {
-  const fields = [
-    { el: els.ocrFOrder, val: '' },
-    { el: els.ocrFCustomer, val: '' },
-    { el: els.ocrFCustno, val: '' },
-    { el: els.ocrFSubinv, val: '' },
-    { el: els.ocrFItem, val: '' },
-    { el: els.ocrFQty, val: '' },
-  ];
-  fields.forEach(({ el }) => {
-    el.textContent = '—';
-    el.className = 'ocr-field-val missing';
-  });
-}
 
-function updateOcrFieldDisplay() {
-  function setField(el, val) {
-    if (val) {
-      el.textContent = val;
-      el.className = 'ocr-field-val';
-    } else {
-      el.textContent = '—';
-      el.className = 'ocr-field-val missing';
-    }
-  }
-  setField(els.ocrFOrder, ocrFields.orderNo);
-  setField(els.ocrFCustomer, ocrFields.customerName);
-  setField(els.ocrFCustno, ocrFields.customerNo);
-  setField(els.ocrFSubinv, ocrFields.subInventory);
-  setField(els.ocrFItem, ocrFields.itemCode);
-  setField(els.ocrFQty, ocrFields.qty);
-  els.ocrFieldsCard.classList.add('show');
+function updateOcrScannedValue() {
+  const parts = [
+    ocrFields.orderNo || '',
+    ocrFields.customerName || '',
+    ocrFields.customerNo || '',
+    ocrFields.subInventory || '',
+  ];
+  
+  const combined = 'OCR/' + parts.filter(Boolean).join('/');
+  if (combined === 'OCR/') return; // Nothing recognized yet
+
+  scannedValue = combined;
+  els.scannedValue.textContent = combined;
+  els.scannedValue.classList.remove('placeholder');
+  els.scannedCard.classList.add('filled', 'ocr-filled');
+  
+  updateSubmitState();
 }
 
 /**
@@ -1084,11 +1012,40 @@ async function startOcrMode() {
   els.ocrStatusText.textContent = '카메라 시작 중...';
 
   try {
+    // 텍스트 인식을 위해 높은 해상도 요청 (기본 1920x1080)
     ocrStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { 
+        facingMode: 'environment', 
+        width: { ideal: 1920, max: 3840 }, 
+        height: { ideal: 1080, max: 2160 }
+      }
     });
     els.ocrVideo.srcObject = ocrStream;
     await els.ocrVideo.play();
+    
+    // 포커스 및 줌 조절 (지원되는 기기용)
+    try {
+      const track = ocrStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+      const constraints = {};
+      
+      // 연속 오토포커스 적용
+      if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+        constraints.focusMode = 'continuous';
+      }
+      
+      // 카메라 렌즈를 문서에 너무 가까이 대지 않도록 약 1.5배~2배 줌 적용
+      if (capabilities.zoom && capabilities.zoom.max > 1) {
+        constraints.zoom = Math.min(capabilities.zoom.max, 1.8);
+      }
+      
+      if (Object.keys(constraints).length > 0) {
+        await track.applyConstraints({ advanced: [constraints] });
+      }
+    } catch (err) {
+      console.warn('Advanced camera constraints not supported:', err);
+    }
+    
   } catch (e) {
     showToast('카메라를 시작할 수 없습니다.', 3000);
     return;
@@ -1186,7 +1143,7 @@ async function processOcrFrame() {
     const fullText = data.text || '';
     const extracted = extractDeliveryFields(fullText, words);
 
-    // 인식된 필드 업데이트
+    // 인식된 필드 업데이트 (기존에 없는 값이거나 새로 인식되면 덮어쓰기 - 갈무리 효과)
     let changed = false;
     ['orderNo','customerName','customerNo','subInventory','itemCode','qty'].forEach(k => {
       if (extracted[k] && extracted[k] !== ocrFields[k]) {
@@ -1196,12 +1153,14 @@ async function processOcrFrame() {
     });
 
     if (changed) {
-      updateOcrFieldDisplay();
+      updateOcrScannedValue();
     }
 
-    // 핵심 필드(주문번호, 고객명, 고객번호, SubInventory) 모두 인식되면 자동 확정
+    // 핵심 필드(주문번호, 고객명, 고객번호, SubInventory) 모두 인식되면 자동 확정 잠금
     if (ocrFields.orderNo && ocrFields.customerName && ocrFields.customerNo && ocrFields.subInventory) {
-      onOcrConfirmed();
+      if (!ocrLocked) {
+        onOcrConfirmed();
+      }
     }
 
   } catch (err) {
@@ -1333,33 +1292,15 @@ function extractDeliveryFields(text, words) {
 }
 
 /**
- * OCR 결과 확정 — scannedValue 세팅 및 UI 업데이트
+ * OCR 결과 확정
  */
 function onOcrConfirmed() {
-  if (ocrLocked) return;
   ocrLocked = true;
-
-  // OCR/ prefix + 필드값 / 구분자
-  const parts = [
-    ocrFields.orderNo || '',
-    ocrFields.customerName || '',
-    ocrFields.customerNo || '',
-    ocrFields.subInventory || '',
-  ];
-  // 빈 값 제거 후 합치기
-  const combined = 'OCR/' + parts.filter(Boolean).join('/');
-
-  scannedValue = combined;
-  els.scannedValue.textContent = combined;
-  els.scannedValue.classList.remove('placeholder');
-  els.scannedCard.classList.add('filled', 'ocr-filled');
   els.frameBox.classList.add('ocr-found');
 
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
-  showToast('문서 인식 완료!', 1800);
-  updateSubmitState();
-  updateOcrFieldDisplay();
-
+  showToast('문서 필수 정보 인식 완료!', 1800);
+  
   // OCR 반복 처리 중단 (잠금 상태에서도 박스는 유지)
   els.ocrStatusText.textContent = '인식 완료';
 }
