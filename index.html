@@ -70,10 +70,15 @@
 
   .frame-overlay{
     position:absolute; inset:0; pointer-events:none;
+    display:flex; flex-direction:column; align-items:center;
+    padding-top:8px;
+  }
+  .frame-box-wrap{
+    flex:1 1 auto; width:100%; min-height:0;
     display:flex; align-items:center; justify-content:center;
   }
   .frame-box{
-    position:relative; width:62%; aspect-ratio:1/1; max-height:80%;
+    position:relative; width:62%; aspect-ratio:1/1; max-height:92%;
   }
   .frame-box .corner{
     position:absolute; width:28px; height:28px;
@@ -86,7 +91,7 @@
   .corner.br{ bottom:0; right:0; border-bottom:4px solid; border-right:4px solid; }
 
   .scan-hint{
-    position:absolute; top:10px; left:0; right:0;
+    flex:0 0 auto;
     text-align:center; color:#fff; font-size:12px; letter-spacing:.06em;
     text-transform:uppercase; opacity:.75; font-weight:600;
   }
@@ -278,9 +283,11 @@
     <div id="reader"></div>
     <div class="frame-overlay">
       <div class="scan-hint">QR 코드를 프레임 안에 맞춰주세요</div>
-      <div class="frame-box" id="frame-box">
-        <div class="corner tl"></div><div class="corner tr"></div>
-        <div class="corner bl"></div><div class="corner br"></div>
+      <div class="frame-box-wrap">
+        <div class="frame-box" id="frame-box">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
       </div>
     </div>
     <button id="settings-btn" type="button" aria-label="설정">⚙</button>
@@ -511,19 +518,25 @@ function escapeHtml(str) {
 }
 
 function generateId() {
-  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  // 구형 브라우저 대비 폴백 (crypto.randomUUID 미지원 시)
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  // 헷갈리기 쉬운 0/O, 1/I/L은 제외한 6자리 코드 (예: K3M9XQ)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const len = 6;
+  let id = '';
+  if (window.crypto && crypto.getRandomValues) {
+    const arr = new Uint32Array(len);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < len; i++) id += chars[arr[i] % chars.length];
+  } else {
+    for (let i = 0; i < len; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
 }
 
 function getDeviceId() {
   try {
     let id = localStorage.getItem(DEVICE_ID_KEY);
-    if (!id) {
+    // 예전 버전에서 발급된 긴 UUID가 저장돼 있으면 짧은 코드로 교체
+    if (!id || id.length > 10) {
       id = generateId();
       localStorage.setItem(DEVICE_ID_KEY, id);
     }
