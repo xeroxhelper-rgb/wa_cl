@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>QR 스캔 → MS Forms 전송</title>
+<title>QR/OCR 스캔 → MS Forms 전송</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -29,6 +29,8 @@
     --muted-2:#5B5647;
     --tab-track:#EDE8DC;
     --order-accent:#1F3A5F;
+    --ocr-accent:#1a7a4a;
+    --ocr-box:#7CFC00;
     --mono: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
   }
@@ -68,6 +70,19 @@
   #reader img{ display:none!important; }
   #reader__dashboard{ display:none!important; }
 
+  /* OCR 모드: 자체 video + canvas */
+  #ocr-video{
+    position:absolute; inset:0;
+    width:100%; height:100%; object-fit:cover;
+    display:none;
+  }
+  #ocr-canvas{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    display:none;
+  }
+
   .frame-overlay{
     position:absolute; inset:0; pointer-events:none;
     display:flex; flex-direction:column; align-items:center;
@@ -80,11 +95,20 @@
   .frame-box{
     position:relative; width:62%; aspect-ratio:1/1; max-height:92%;
   }
+  /* OCR 모드에서는 프레임 박스를 문서형으로 (더 넓게) */
+  .frame-box.ocr-mode{
+    width:85%; aspect-ratio:4/3;
+  }
   .frame-box .corner{
     position:absolute; width:28px; height:28px;
     border-color:#fff; transition:border-color .15s ease;
   }
   .frame-box.found .corner{ border-color:var(--ok); }
+  .frame-box.ocr-mode .corner{ border-color:#7CFC00; }
+  .frame-box.ocr-found .corner{ border-color:#7CFC00; animation:pulse-green .5s ease; }
+  @keyframes pulse-green{
+    0%{border-color:#fff;} 50%{border-color:#7CFC00;} 100%{border-color:#7CFC00;}
+  }
   .corner.tl{ top:0; left:0; border-top:4px solid; border-left:4px solid; }
   .corner.tr{ top:0; right:0; border-top:4px solid; border-right:4px solid; }
   .corner.bl{ bottom:0; left:0; border-bottom:4px solid; border-left:4px solid; }
@@ -102,6 +126,51 @@
     background:rgba(255,255,255,.18); color:#fff; font-size:15px;
     display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
     text-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+
+  /* ---------- 모드 전환 토글 (카메라 우측 하단) ---------- */
+  #mode-toggle-wrap{
+    position:absolute; bottom:10px; right:12px; z-index:10;
+    display:flex; align-items:center; gap:5px;
+    background:rgba(0,0,0,.45); border-radius:999px;
+    padding:4px 8px 4px 6px; backdrop-filter:blur(4px);
+    pointer-events:all;
+  }
+  .mode-label{
+    font-size:10px; font-weight:700; letter-spacing:.07em;
+    color:rgba(255,255,255,.8); text-transform:uppercase;
+    line-height:1; transition:color .2s;
+  }
+  .mode-label.active{ color:#7CFC00; }
+  /* 소형 토글 스위치 */
+  .mini-switch{ position:relative; display:inline-block; width:36px; height:20px; flex:0 0 auto; }
+  .mini-switch input{ position:absolute; opacity:0; width:0; height:0; }
+  .mini-switch-slider{
+    position:absolute; inset:0; background:rgba(255,255,255,.3); cursor:pointer;
+    transition:.2s; border-radius:999px;
+  }
+  .mini-switch-slider::before{
+    content:""; position:absolute; height:14px; width:14px; left:3px; bottom:3px;
+    background:#fff; transition:.2s; border-radius:50%;
+  }
+  .mini-switch input:checked + .mini-switch-slider{ background:#1a7a4a; }
+  .mini-switch input:checked + .mini-switch-slider::before{ transform:translateX(16px); }
+
+  /* OCR 상태 뱃지 */
+  #ocr-status-badge{
+    position:absolute; top:10px; left:12px; z-index:10;
+    display:none; align-items:center; gap:5px;
+    background:rgba(0,0,0,.5); border-radius:999px;
+    padding:4px 10px; backdrop-filter:blur(4px);
+  }
+  #ocr-status-badge.show{ display:flex; }
+  .ocr-dot{
+    width:7px; height:7px; border-radius:50%; background:#7CFC00;
+    animation:blink 1.2s ease infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  #ocr-status-text{
+    font-size:10px; font-weight:700; color:#fff; letter-spacing:.06em; text-transform:uppercase;
   }
 
   /* ---------- 하단: 입력 영역 ---------- */
@@ -141,6 +210,7 @@
     padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
   }
   #scanned-card.filled{ border-color:var(--ok); background:#F1FAF3; }
+  #scanned-card.filled.ocr-filled{ border-color:#1a7a4a; background:#edf7f2; }
   #scanned-value{
     font-family:var(--mono); font-size:15px; font-weight:600; color:var(--ink);
     word-break:break-all; line-height:1.3;
@@ -151,6 +221,27 @@
     line-height:1; padding:4px 6px; cursor:pointer;
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
+
+  /* OCR 인식 필드 세부 카드 */
+  #ocr-fields-card{
+    display:none;
+    border:1.5px solid #a8ddc0; background:#f0faf5; border-radius:10px;
+    padding:10px 12px; gap:6px; flex-direction:column;
+  }
+  #ocr-fields-card.show{ display:flex; }
+  .ocr-field-row{
+    display:flex; align-items:center; gap:8px; font-size:13px;
+  }
+  .ocr-field-key{
+    flex:0 0 auto; min-width:90px;
+    font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:#1a7a4a; background:#d4f0e2; padding:2px 7px; border-radius:6px;
+  }
+  .ocr-field-val{
+    font-family:var(--mono); font-weight:600; color:var(--ink); font-size:13px;
+    word-break:break-all;
+  }
+  .ocr-field-val.missing{ color:var(--muted-soft); font-style:italic; font-family:var(--sans); }
 
   #quantity-fields{ display:flex; flex-direction:column; gap:10px; }
 
@@ -281,8 +372,13 @@
 
   <div id="scan-section">
     <div id="reader"></div>
+
+    <!-- OCR 모드: 자체 video + canvas -->
+    <video id="ocr-video" autoplay playsinline muted></video>
+    <canvas id="ocr-canvas"></canvas>
+
     <div class="frame-overlay">
-      <div class="scan-hint">QR 코드를 프레임 안에 맞춰주세요</div>
+      <div class="scan-hint" id="scan-hint">QR 코드를 프레임 안에 맞춰주세요</div>
       <div class="frame-box-wrap">
         <div class="frame-box" id="frame-box">
           <div class="corner tl"></div><div class="corner tr"></div>
@@ -290,7 +386,24 @@
         </div>
       </div>
     </div>
+
+    <!-- OCR 상태 뱃지 (좌상단) -->
+    <div id="ocr-status-badge">
+      <div class="ocr-dot"></div>
+      <span id="ocr-status-text">인식 중...</span>
+    </div>
+
     <button id="settings-btn" type="button" aria-label="설정">⚙</button>
+
+    <!-- 모드 전환 토글 (우측 하단) -->
+    <div id="mode-toggle-wrap">
+      <span class="mode-label active" id="label-qr">QR</span>
+      <label class="mini-switch" title="OCR 문서 스캔 모드">
+        <input type="checkbox" id="mode-toggle">
+        <span class="mini-switch-slider"></span>
+      </label>
+      <span class="mode-label" id="label-ocr">OCR</span>
+    </div>
   </div>
 
   <div id="input-section">
@@ -307,6 +420,34 @@
       <div id="scanned-card">
         <span id="scanned-value" class="placeholder">QR 코드를 스캔하세요</span>
         <button id="clear-scan" title="지우기">✕</button>
+      </div>
+    </div>
+
+    <!-- OCR 인식 필드 세부 표시 -->
+    <div id="ocr-fields-card">
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">주문번호</span>
+        <span class="ocr-field-val missing" id="ocr-f-order">—</span>
+      </div>
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">고객명</span>
+        <span class="ocr-field-val missing" id="ocr-f-customer">—</span>
+      </div>
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">고객번호</span>
+        <span class="ocr-field-val missing" id="ocr-f-custno">—</span>
+      </div>
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">Sub Inventory</span>
+        <span class="ocr-field-val missing" id="ocr-f-subinv">—</span>
+      </div>
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">Item Code</span>
+        <span class="ocr-field-val missing" id="ocr-f-item">—</span>
+      </div>
+      <div class="ocr-field-row">
+        <span class="ocr-field-key">Qty</span>
+        <span class="ocr-field-val missing" id="ocr-f-qty">—</span>
       </div>
     </div>
 
@@ -341,7 +482,7 @@
 <div id="settings-modal" class="modal-overlay">
   <div class="modal-card">
     <div class="modal-title">설정</div>
-    <div class="modal-body">기기 고유 번호는 전송 시 QR 스캔 값과 함께 전달되어 담당자(기기)를 구분하는 데 사용됩니다. 개인정보는 수집하지 않으며, 이 기기 안에서 자동으로 발급된 번호입니다.</div>
+    <div class="modal-body">기기 고유 번호는 전송 시 스캔 값과 함께 전달되어 담당자(기기)를 구분하는 데 사용됩니다. 개인정보는 수집하지 않으며, 이 기기 안에서 자동으로 발급된 번호입니다.</div>
     <div id="device-id-display" class="device-id-box" title="눌러서 복사"></div>
     <div class="settings-row">
       <span class="settings-row-label">다크 모드</span>
@@ -363,14 +504,13 @@
 </div>
 
 <script src="vendor/html5-qrcode.min.js"></script>
+<script src="vendor/tesseract.min.js"></script>
 <script>
 /* =========================================================
    설정 (CONFIG) — 이 블록만 수정하면 됩니다
    ========================================================= */
 const CONFIG = {
   // 1) Microsoft Forms에서 "미리 채워진 링크(Get Pre-filled link)"로 생성한 URL을 붙여넣으세요.
-  //    링크를 만들 때 각 문항에는 아래 PLACEHOLDER 문자열을 그대로 입력해서 생성하면,
-  //    이 코드가 문항 파라미터명을 몰라도 문자열 치환만으로 값을 채울 수 있습니다.
   MS_FORMS_TEMPLATE_URL: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=hTfGPKK40UG8RH2Kj_o9bnwRZnTmg9hAjZ0tvYsLBy9UOUlHNEJHVFM1MlpOSzMxUVU0ODZGS1RRUC4u&r4a28f38cdf1f41f99e4864aaa9ee2ba8=QR_VALUE_HERE&&rbd4498299293499181f6d7490da14e96=ORDER_QTY_HERE&rdd4db81f726a452abe98d4b79795b3db=RECOVERY_QTY_HERE",
 
   PLACEHOLDER_QR: "QR_VALUE_HERE",
@@ -379,13 +519,9 @@ const CONFIG = {
   // 2) 전송 후 MS Forms를 새 탭으로 열지(true), 현재 화면에서 이동할지(false) 선택.
   OPEN_IN_NEW_TAB: true,
 
-  // 2-1) 안드로이드에서는 Chrome Custom Tab을 거치지 않고 실제 기본 브라우저로 강제 이동
-  //      (Chrome Custom Tab이 MS Forms를 데스크톱형 레이아웃으로 렌더링하는 문제 회피용)
   FORCE_DEFAULT_BROWSER_ON_ANDROID: true,
 
-  // 3) 탭으로 묶어 하나의 입력 공간에서 여러 항목을 전환하며 입력받는 그룹.
-  //    각 tab의 값은 " / "로 이어붙여 하나의 MS Forms 문항(placeholder)에 전달됩니다.
-  //    예) Toner=3, Drum=5 선택 시 → "3 / 5" 로 전달 (비어있는 항목은 "0"으로 처리)
+  // 3) 탭 그룹 수량 필드
   QUANTITY_TAB_GROUPS: [
     {
       key: "order",
@@ -413,20 +549,49 @@ const CONFIG = {
     }
   ],
 
-  // 4) 탭 없이 단독으로 표시되는 수량 항목 목록 (현재는 사용하는 항목 없음)
   QUANTITY_FIELDS: [],
+  REQUIRE_ALL_QUANTITIES: false,
 
-  // 5) 위 수량 항목을 모두 선택해야 전송 버튼이 활성화되게 하려면 true
-  REQUIRE_ALL_QUANTITIES: false
+  // 4) OCR Tesseract 설정 — vendor/ 로컬 경로
+  TESSERACT_WORKER_PATH: 'vendor/tesseract-worker.min.js',
+  TESSERACT_LANG_PATH: 'vendor/tessdata',
+  TESSERACT_CORE_PATH: 'vendor/tesseract-core.wasm.js',  // 없으면 자동
+  TESSERACT_LANGS: 'kor+eng',
 };
 /* ========================================================= */
 
+/* ============================================================
+   상태 변수
+   ============================================================ */
 let scannedValue = "";
 const quantityState = {};
 let html5QrCode = null;
 let isPaused = false;
 let awaitingFormsReturn = false;
 
+// OCR 관련 상태
+let scanMode = 'qr';          // 'qr' | 'ocr'
+let ocrWorker = null;
+let ocrStream = null;
+let ocrRunning = false;
+let ocrAnimFrame = null;
+let ocrLocked = false;         // 인식 확정 후 잠금
+let ocrInitialized = false;
+let ocrInitializing = false;
+
+// OCR 인식 필드 상태
+let ocrFields = {
+  orderNo: '',
+  customerName: '',
+  customerNo: '',
+  subInventory: '',
+  itemCode: '',
+  qty: ''
+};
+
+/* ============================================================
+   DOM 요소
+   ============================================================ */
 const els = {
   scannedValue: document.getElementById('scanned-value'),
   scannedCard: document.getElementById('scanned-card'),
@@ -448,9 +613,28 @@ const els = {
   settingsCloseBtn: document.getElementById('settings-close-btn'),
   historyModal: document.getElementById('history-modal'),
   historyList: document.getElementById('history-list'),
-  historyCloseBtn: document.getElementById('history-close-btn')
+  historyCloseBtn: document.getElementById('history-close-btn'),
+  scanHint: document.getElementById('scan-hint'),
+  modeToggle: document.getElementById('mode-toggle'),
+  labelQr: document.getElementById('label-qr'),
+  labelOcr: document.getElementById('label-ocr'),
+  ocrVideo: document.getElementById('ocr-video'),
+  ocrCanvas: document.getElementById('ocr-canvas'),
+  ocrStatusBadge: document.getElementById('ocr-status-badge'),
+  ocrStatusText: document.getElementById('ocr-status-text'),
+  ocrFieldsCard: document.getElementById('ocr-fields-card'),
+  ocrFOrder: document.getElementById('ocr-f-order'),
+  ocrFCustomer: document.getElementById('ocr-f-customer'),
+  ocrFCustno: document.getElementById('ocr-f-custno'),
+  ocrFSubinv: document.getElementById('ocr-f-subinv'),
+  ocrFItem: document.getElementById('ocr-f-item'),
+  ocrFQty: document.getElementById('ocr-f-qty'),
+  reader: document.getElementById('reader'),
 };
 
+/* ============================================================
+   유틸리티
+   ============================================================ */
 function showToast(msg, ms = 2200) {
   els.toast.textContent = msg;
   els.toast.classList.add('show');
@@ -472,11 +656,9 @@ function loadHistory() {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (parsed.date !== todayKey()) return []; // 날짜가 바뀌면 새로 시작
+    if (parsed.date !== todayKey()) return [];
     return parsed.entries || [];
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
 
 function saveHistory(entries) {
@@ -518,7 +700,6 @@ function escapeHtml(str) {
 }
 
 function generateId() {
-  // 헷갈리기 쉬운 0/O, 1/I/L은 제외한 6자리 코드 (예: K3M9XQ)
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const len = 6;
   let id = '';
@@ -535,15 +716,12 @@ function generateId() {
 function getDeviceId() {
   try {
     let id = localStorage.getItem(DEVICE_ID_KEY);
-    // 예전 버전에서 발급된 긴 UUID가 저장돼 있으면 짧은 코드로 교체
     if (!id || id.length > 10) {
       id = generateId();
       localStorage.setItem(DEVICE_ID_KEY, id);
     }
     return id;
-  } catch (e) {
-    return '';
-  }
+  } catch (e) { return ''; }
 }
 
 function getTheme() {
@@ -565,15 +743,15 @@ function setTheme(theme) {
   applyTheme(theme);
 }
 
+/* ============================================================
+   모달
+   ============================================================ */
 function openSettingsModal() {
   els.deviceIdDisplay.textContent = getDeviceId();
   els.darkModeToggle.checked = (getTheme() === 'dark');
   els.settingsModal.classList.add('show');
 }
-
-function closeSettingsModal() {
-  els.settingsModal.classList.remove('show');
-}
+function closeSettingsModal() { els.settingsModal.classList.remove('show'); }
 
 function openHistoryModal() {
   const entries = loadHistory();
@@ -591,10 +769,7 @@ function openHistoryModal() {
   }
   els.historyModal.classList.add('show');
 }
-
-function closeHistoryModal() {
-  els.historyModal.classList.remove('show');
-}
+function closeHistoryModal() { els.historyModal.classList.remove('show'); }
 
 function renderTodayDate() {
   const now = new Date();
@@ -605,6 +780,9 @@ function renderTodayDate() {
   els.todayDate.textContent = `${m}.${d}(${days[now.getDay()]}) · 오늘 ${count}건`;
 }
 
+/* ============================================================
+   수량 필드 렌더링
+   ============================================================ */
 function renderTabGroup(group) {
   group.tabs.forEach((t) => { quantityState[t.key] = ""; });
   let activeIndex = 0;
@@ -734,12 +912,18 @@ function updateSubmitState() {
   els.submitBtn.disabled = !(hasScan && quantitiesOk);
 }
 
+/* ============================================================
+   QR 스캐너
+   ============================================================ */
 function onScanSuccess(decodedText) {
-  if (decodedText === scannedValue) return; // 동일 코드 중복 무시
-  scannedValue = decodedText;
-  els.scannedValue.textContent = decodedText;
+  if (decodedText === scannedValue) return;
+  // QR 모드: QR/ prefix 붙임
+  const prefixed = 'QR/' + decodedText;
+  scannedValue = prefixed;
+  els.scannedValue.textContent = prefixed;
   els.scannedValue.classList.remove('placeholder');
   els.scannedCard.classList.add('filled');
+  els.scannedCard.classList.remove('ocr-filled');
   els.frameBox.classList.add('found');
   if (navigator.vibrate) navigator.vibrate(80);
   updateSubmitState();
@@ -748,11 +932,23 @@ function onScanSuccess(decodedText) {
 
 function resetScanState() {
   scannedValue = "";
-  els.scannedValue.textContent = "QR 코드를 스캔하세요";
+  ocrLocked = false;
+  ocrFields = { orderNo:'', customerName:'', customerNo:'', subInventory:'', itemCode:'', qty:'' };
+
+  if (scanMode === 'qr') {
+    els.scannedValue.textContent = "QR 코드를 스캔하세요";
+  } else {
+    els.scannedValue.textContent = "문서를 카메라에 비춰주세요";
+  }
   els.scannedValue.classList.add('placeholder');
-  els.scannedCard.classList.remove('filled');
-  els.frameBox.classList.remove('found');
+  els.scannedCard.classList.remove('filled', 'ocr-filled');
+  els.frameBox.classList.remove('found', 'ocr-found');
   els.textInput.value = "";
+
+  // OCR 필드 초기화
+  resetOcrFieldDisplay();
+  els.ocrFieldsCard.classList.remove('show');
+
   renderQuantityFields();
   updateSubmitState();
 }
@@ -782,13 +978,441 @@ function startScanner() {
   });
 }
 
+function stopQrScanner() {
+  return new Promise((resolve) => {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        html5QrCode = null;
+        isPaused = false;
+        resolve();
+      }).catch(() => {
+        html5QrCode = null;
+        isPaused = false;
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+/* ============================================================
+   OCR 모드
+   ============================================================ */
+function resetOcrFieldDisplay() {
+  const fields = [
+    { el: els.ocrFOrder, val: '' },
+    { el: els.ocrFCustomer, val: '' },
+    { el: els.ocrFCustno, val: '' },
+    { el: els.ocrFSubinv, val: '' },
+    { el: els.ocrFItem, val: '' },
+    { el: els.ocrFQty, val: '' },
+  ];
+  fields.forEach(({ el }) => {
+    el.textContent = '—';
+    el.className = 'ocr-field-val missing';
+  });
+}
+
+function updateOcrFieldDisplay() {
+  function setField(el, val) {
+    if (val) {
+      el.textContent = val;
+      el.className = 'ocr-field-val';
+    } else {
+      el.textContent = '—';
+      el.className = 'ocr-field-val missing';
+    }
+  }
+  setField(els.ocrFOrder, ocrFields.orderNo);
+  setField(els.ocrFCustomer, ocrFields.customerName);
+  setField(els.ocrFCustno, ocrFields.customerNo);
+  setField(els.ocrFSubinv, ocrFields.subInventory);
+  setField(els.ocrFItem, ocrFields.itemCode);
+  setField(els.ocrFQty, ocrFields.qty);
+  els.ocrFieldsCard.classList.add('show');
+}
+
+/**
+ * Tesseract.js Worker 초기화 (로컬 오프라인)
+ */
+async function initOcrWorker() {
+  if (ocrInitialized) return true;
+  if (ocrInitializing) return false;
+  ocrInitializing = true;
+
+  try {
+    els.ocrStatusText.textContent = '초기화 중...';
+    els.ocrStatusBadge.classList.add('show');
+
+    // Tesseract.js v5 API
+    ocrWorker = await Tesseract.createWorker(CONFIG.TESSERACT_LANGS, 1, {
+      workerPath: CONFIG.TESSERACT_WORKER_PATH,
+      langPath: CONFIG.TESSERACT_LANG_PATH,
+      corePath: CONFIG.TESSERACT_CORE_PATH,
+      logger: () => {},
+    });
+
+    ocrInitialized = true;
+    ocrInitializing = false;
+    els.ocrStatusText.textContent = '인식 중...';
+    return true;
+  } catch (err) {
+    console.error('OCR 초기화 실패:', err);
+    // CDN fallback
+    try {
+      ocrWorker = await Tesseract.createWorker(CONFIG.TESSERACT_LANGS, 1, {
+        logger: () => {},
+      });
+      ocrInitialized = true;
+      ocrInitializing = false;
+      els.ocrStatusText.textContent = '인식 중...';
+      return true;
+    } catch (err2) {
+      console.error('OCR 초기화 실패 (fallback):', err2);
+      showToast('OCR 초기화에 실패했습니다.', 3000);
+      ocrInitializing = false;
+      return false;
+    }
+  }
+}
+
+async function startOcrMode() {
+  els.ocrVideo.style.display = 'block';
+  els.ocrCanvas.style.display = 'block';
+  els.ocrStatusBadge.classList.add('show');
+  els.ocrStatusText.textContent = '카메라 시작 중...';
+
+  try {
+    ocrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    els.ocrVideo.srcObject = ocrStream;
+    await els.ocrVideo.play();
+  } catch (e) {
+    showToast('카메라를 시작할 수 없습니다.', 3000);
+    return;
+  }
+
+  // Worker 초기화 (비동기, 카메라와 병렬)
+  initOcrWorker();
+
+  ocrRunning = true;
+  scheduleOcrFrame();
+}
+
+function stopOcrMode() {
+  ocrRunning = false;
+  if (ocrAnimFrame) { cancelAnimationFrame(ocrAnimFrame); ocrAnimFrame = null; }
+  if (ocrStream) {
+    ocrStream.getTracks().forEach(t => t.stop());
+    ocrStream = null;
+  }
+  els.ocrVideo.style.display = 'none';
+  els.ocrCanvas.style.display = 'none';
+  els.ocrStatusBadge.classList.remove('show');
+
+  // Canvas 클리어
+  const ctx = els.ocrCanvas.getContext('2d');
+  ctx.clearRect(0, 0, els.ocrCanvas.width, els.ocrCanvas.height);
+}
+
+let ocrProcessing = false;
+let ocrFrameCount = 0;
+const OCR_FRAME_INTERVAL = 8; // 매 8프레임마다 OCR 실행 (약 2fps)
+
+function scheduleOcrFrame() {
+  if (!ocrRunning) return;
+  ocrAnimFrame = requestAnimationFrame(() => {
+    ocrFrameCount++;
+    if (ocrFrameCount % OCR_FRAME_INTERVAL === 0 && !ocrProcessing && !ocrLocked) {
+      processOcrFrame();
+    } else if (!ocrLocked) {
+      // 박스는 매 프레임 다시 그림 (이전 결과 유지)
+      redrawOcrBoxes();
+    }
+    scheduleOcrFrame();
+  });
+}
+
+// 마지막으로 인식된 단어 박스 목록 (시각화용)
+let lastOcrWords = [];
+let lastOcrImageSize = { w: 1, h: 1 };
+
+function redrawOcrBoxes() {
+  if (lastOcrWords.length === 0) return;
+  const video = els.ocrVideo;
+  const canvas = els.ocrCanvas;
+  canvas.width = video.videoWidth || canvas.offsetWidth;
+  canvas.height = video.videoHeight || canvas.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawWordBoxes(ctx, lastOcrWords, lastOcrImageSize, canvas.width, canvas.height);
+}
+
+async function processOcrFrame() {
+  if (!ocrInitialized || !ocrWorker) return;
+  if (!els.ocrVideo.videoWidth) return;
+
+  ocrProcessing = true;
+
+  try {
+    // 카메라 프레임을 임시 캔버스에 캡처
+    const captureCanvas = document.createElement('canvas');
+    captureCanvas.width = els.ocrVideo.videoWidth;
+    captureCanvas.height = els.ocrVideo.videoHeight;
+    const captureCtx = captureCanvas.getContext('2d');
+    captureCtx.drawImage(els.ocrVideo, 0, 0);
+
+    // OCR 실행
+    const result = await ocrWorker.recognize(captureCanvas);
+    const { data } = result;
+
+    // 오버레이 캔버스 업데이트
+    const canvas = els.ocrCanvas;
+    canvas.width = els.ocrVideo.videoWidth;
+    canvas.height = els.ocrVideo.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 단어 박스 추출 및 시각화
+    const words = data.words || [];
+    lastOcrWords = words;
+    lastOcrImageSize = { w: captureCanvas.width, h: captureCanvas.height };
+
+    drawWordBoxes(ctx, words, lastOcrImageSize, canvas.width, canvas.height);
+
+    // 텍스트에서 필드 추출
+    const fullText = data.text || '';
+    const extracted = extractDeliveryFields(fullText, words);
+
+    // 인식된 필드 업데이트
+    let changed = false;
+    ['orderNo','customerName','customerNo','subInventory','itemCode','qty'].forEach(k => {
+      if (extracted[k] && extracted[k] !== ocrFields[k]) {
+        ocrFields[k] = extracted[k];
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      updateOcrFieldDisplay();
+    }
+
+    // 핵심 필드(주문번호, 고객명, 고객번호, SubInventory) 모두 인식되면 자동 확정
+    if (ocrFields.orderNo && ocrFields.customerName && ocrFields.customerNo && ocrFields.subInventory) {
+      onOcrConfirmed();
+    }
+
+  } catch (err) {
+    console.warn('OCR 처리 오류:', err);
+  }
+
+  ocrProcessing = false;
+}
+
+/**
+ * OCR 단어에 연두색 박스를 그립니다
+ */
+function drawWordBoxes(ctx, words, imgSize, canvasW, canvasH) {
+  const scaleX = canvasW / imgSize.w;
+  const scaleY = canvasH / imgSize.h;
+
+  words.forEach(word => {
+    if (!word.text || word.text.trim().length < 1) return;
+    if (word.confidence < 30) return; // 신뢰도 낮은 단어 제외
+
+    const { x0, y0, x1, y1 } = word.bbox;
+    const rx = x0 * scaleX;
+    const ry = y0 * scaleY;
+    const rw = (x1 - x0) * scaleX;
+    const rh = (y1 - y0) * scaleY;
+
+    // 키워드 여부 확인 (핵심 키워드는 더 밝게)
+    const isKeyword = isKeywordWord(word.text);
+
+    ctx.strokeStyle = isKeyword ? '#7CFC00' : 'rgba(124,252,0,0.5)';
+    ctx.lineWidth = isKeyword ? 2.5 : 1.5;
+    ctx.shadowColor = '#7CFC00';
+    ctx.shadowBlur = isKeyword ? 6 : 2;
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.shadowBlur = 0;
+
+    // 키워드 단어는 배경도 표시
+    if (isKeyword) {
+      ctx.fillStyle = 'rgba(124,252,0,0.15)';
+      ctx.fillRect(rx, ry, rw, rh);
+    }
+  });
+}
+
+function isKeywordWord(text) {
+  const t = text.replace(/\s/g, '');
+  return (
+    /\d{9,}/.test(t) ||              // 긴 숫자 (주문번호 등)
+    /KRC\d+/i.test(t) ||             // 고객번호
+    /PA[12]\w*/i.test(t) ||          // Sub Inventory
+    /\d{1,2}SBC\w*/i.test(t) ||      // Item Code
+    /주문번호|OrderNo/i.test(t) ||
+    /고객명|고객번호/.test(t) ||
+    /Sub\s?Inventory/i.test(t)
+  );
+}
+
+/**
+ * OCR 전체 텍스트 + 단어 목록에서 배송전표 필드 추출
+ */
+function extractDeliveryFields(text, words) {
+  const result = {};
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // ── 주문번호 ──────────────────────────────────────────
+  // "주문번호(Order No):" 행에서 9자리 이상 숫자 추출
+  for (const line of lines) {
+    if (/주문번호|Order\s*No/i.test(line)) {
+      const m = line.match(/(\d{6,})/);
+      if (m) { result.orderNo = m[1]; break; }
+    }
+  }
+  // fallback: 30로 시작하는 9자리 숫자
+  if (!result.orderNo) {
+    const m = text.match(/\b(3\d{8,11})\b/);
+    if (m) result.orderNo = m[1];
+  }
+
+  // ── 고객번호 ──────────────────────────────────────────
+  // KRC로 시작하는 영숫자 (예: KRC054567)
+  const krcMatch = text.match(/\b(KRC\d{4,8})\b/i);
+  if (krcMatch) result.customerNo = krcMatch[1].toUpperCase();
+
+  // ── 고객명 ────────────────────────────────────────────
+  // "고객명:" 행 또는 KRC 번호 주변 텍스트
+  for (const line of lines) {
+    if (/고객명/.test(line)) {
+      // "고객명:" 이후 텍스트
+      let val = line.replace(/고객명\s*[:：]?\s*/, '').trim();
+      // KRC 번호 부분 제거
+      val = val.replace(/KRC\d+/gi, '').trim();
+      if (val.length > 1 && val.length < 40) {
+        result.customerName = val;
+        break;
+      }
+    }
+  }
+  // fallback: 주식회사 or 회사 패턴
+  if (!result.customerName) {
+    const m = text.match(/(주식회사\s*\S+|\S+주식회사|\S+\s*대영|\S+\s*법인)/);
+    if (m) result.customerName = m[1].trim();
+  }
+
+  // ── Sub Inventory ──────────────────────────────────────
+  // PA1SN1, PA2SN1 등 패턴
+  const subInvMatch = text.match(/\b(PA\d[A-Z0-9]+)\b/i);
+  if (subInvMatch) result.subInventory = subInvMatch[1].toUpperCase();
+  // fallback: Sub Inventory 행 다음 줄
+  if (!result.subInventory) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/Sub\s*Inventory/i.test(lines[i]) && lines[i+1]) {
+        const m = lines[i+1].match(/([A-Z0-9]{3,})/i);
+        if (m) { result.subInventory = m[1].toUpperCase(); break; }
+      }
+    }
+  }
+
+  // ── Item Code ─────────────────────────────────────────
+  // 숫자+SBC 또는 특정 패턴 (예: 1SBC040080, 15BC...)
+  const itemMatch = text.match(/\b(\d*[A-Z]{2,4}\d{4,})\b/);
+  if (itemMatch) result.itemCode = itemMatch[1];
+
+  // ── Qty (수량) ────────────────────────────────────────
+  // PAC 또는 BOX 앞에 오는 숫자
+  const qtyMatch = text.match(/(\d+)\s*(?:PAC|BOX|EA|PCS|SET)/i);
+  if (qtyMatch) result.qty = qtyMatch[1];
+
+  return result;
+}
+
+/**
+ * OCR 결과 확정 — scannedValue 세팅 및 UI 업데이트
+ */
+function onOcrConfirmed() {
+  if (ocrLocked) return;
+  ocrLocked = true;
+
+  // OCR/ prefix + 필드값 / 구분자
+  const parts = [
+    ocrFields.orderNo || '',
+    ocrFields.customerName || '',
+    ocrFields.customerNo || '',
+    ocrFields.subInventory || '',
+  ];
+  // 빈 값 제거 후 합치기
+  const combined = 'OCR/' + parts.filter(Boolean).join('/');
+
+  scannedValue = combined;
+  els.scannedValue.textContent = combined;
+  els.scannedValue.classList.remove('placeholder');
+  els.scannedCard.classList.add('filled', 'ocr-filled');
+  els.frameBox.classList.add('ocr-found');
+
+  if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+  showToast('문서 인식 완료!', 1800);
+  updateSubmitState();
+  updateOcrFieldDisplay();
+
+  // OCR 반복 처리 중단 (잠금 상태에서도 박스는 유지)
+  els.ocrStatusText.textContent = '인식 완료';
+}
+
+/* ============================================================
+   모드 전환
+   ============================================================ */
+async function switchToQrMode() {
+  scanMode = 'qr';
+
+  // OCR 정리
+  stopOcrMode();
+
+  // UI 업데이트
+  els.labelQr.classList.add('active');
+  els.labelOcr.classList.remove('active');
+  els.frameBox.classList.remove('ocr-mode', 'ocr-found');
+  els.scanHint.textContent = 'QR 코드를 프레임 안에 맞춰주세요';
+
+  // QR 스캐너 시작
+  await startScanner();
+  resetScanState();
+}
+
+async function switchToOcrMode() {
+  scanMode = 'ocr';
+
+  // QR 스캐너 정리
+  await stopQrScanner();
+
+  // UI 업데이트
+  els.labelOcr.classList.add('active');
+  els.labelQr.classList.remove('active');
+  els.frameBox.classList.add('ocr-mode');
+  els.frameBox.classList.remove('found');
+  els.scanHint.textContent = '문서를 카메라에 비춰주세요';
+
+  resetScanState();
+
+  // OCR 모드 시작
+  await startOcrMode();
+}
+
+/* ============================================================
+   Forms URL 빌드
+   ============================================================ */
 function buildFormsUrl() {
   const textVal = els.textInput.value || "";
   const deviceId = getDeviceId();
-  const qrCombined = deviceId ? `${scannedValue} / ${deviceId}` : scannedValue;
+  const scanCombined = deviceId ? `${scannedValue} / ${deviceId}` : scannedValue;
 
   let url = CONFIG.MS_FORMS_TEMPLATE_URL;
-  url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(qrCombined));
+  url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(scanCombined));
 
   CONFIG.QUANTITY_FIELDS.forEach((f) => {
     url = url.split(f.placeholder).join(encodeURIComponent(quantityState[f.key] || ""));
@@ -816,22 +1440,14 @@ function isOnline() {
   return navigator.onLine;
 }
 
-function showOfflineModal() {
-  els.offlineModal.classList.add('show');
-}
-
-function hideOfflineModal() {
-  els.offlineModal.classList.remove('show');
-}
+function showOfflineModal() { els.offlineModal.classList.add('show'); }
+function hideOfflineModal() { els.offlineModal.classList.remove('show'); }
 
 function proceedToForms() {
   const url = buildFormsUrl();
   recordHistoryEntry();
   awaitingFormsReturn = true;
 
-//  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
-//    window.location.href = buildAndroidIntentUrl(url);
-//  } else if (CONFIG.OPEN_IN_NEW_TAB) {
   if (CONFIG.OPEN_IN_NEW_TAB) {
     window.open(url, '_blank');
   } else {
@@ -839,8 +1455,19 @@ function proceedToForms() {
   }
 
   showToast("전송되었습니다. 폼 화면에서 제출을 눌러주세요.");
+
+  // 초기화 (OCR 모드일 때는 카메라 스트림은 유지하고 잠금만 해제)
   resetScanState();
-  resumeScanner();
+
+  if (scanMode === 'qr') {
+    resumeScanner();
+  } else {
+    // OCR 모드 재시작 (잠금 해제 후 계속 인식)
+    ocrLocked = false;
+    ocrFields = { orderNo:'', customerName:'', customerNo:'', subInventory:'', itemCode:'', qty:'' };
+    els.ocrStatusText.textContent = '인식 중...';
+  }
+
   renderTodayDate();
 }
 
@@ -857,9 +1484,33 @@ function handleSubmit() {
   proceedToForms();
 }
 
+/* ============================================================
+   이벤트 리스너
+   ============================================================ */
 els.submitBtn.addEventListener('click', handleSubmit);
-els.rescanBtn.addEventListener('click', () => { resetScanState(); resumeScanner(); });
-els.clearScan.addEventListener('click', () => { resetScanState(); resumeScanner(); });
+
+els.rescanBtn.addEventListener('click', () => {
+  resetScanState();
+  if (scanMode === 'qr') {
+    resumeScanner();
+  } else {
+    // OCR 재스캔: 잠금 해제
+    ocrLocked = false;
+    ocrFields = { orderNo:'', customerName:'', customerNo:'', subInventory:'', itemCode:'', qty:'' };
+    els.ocrStatusText.textContent = '인식 중...';
+  }
+});
+
+els.clearScan.addEventListener('click', () => {
+  resetScanState();
+  if (scanMode === 'qr') {
+    resumeScanner();
+  } else {
+    ocrLocked = false;
+    ocrFields = { orderNo:'', customerName:'', customerNo:'', subInventory:'', itemCode:'', qty:'' };
+    els.ocrStatusText.textContent = '인식 중...';
+  }
+});
 
 els.offlineModalConfirm.addEventListener('click', () => {
   if (!isOnline()) {
@@ -891,11 +1542,19 @@ els.historyModal.addEventListener('click', (e) => {
   if (e.target === els.historyModal) closeHistoryModal();
 });
 
-// MS Forms로 이동했다가 돌아왔을 때(탭 전환/뒤로가기 등 어떤 경로든) 반드시 초기화되도록
-// proceedToForms()에서 세팅하는 플래그를 여기서 확인합니다.
+// 모드 전환 토글
+els.modeToggle.addEventListener('change', async () => {
+  if (els.modeToggle.checked) {
+    await switchToOcrMode();
+  } else {
+    await switchToQrMode();
+  }
+});
+
+// MS Forms로 이동했다가 돌아왔을 때 초기화
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    resumeScanner();
+    if (scanMode === 'qr') resumeScanner();
     if (awaitingFormsReturn) {
       awaitingFormsReturn = false;
       resetScanState();
@@ -904,16 +1563,18 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// location.href로 이동했다가 브라우저 "뒤로가기"로 돌아온 경우(bfcache 복원) 대비
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
     awaitingFormsReturn = false;
     resetScanState();
-    resumeScanner();
+    if (scanMode === 'qr') resumeScanner();
     renderTodayDate();
   }
 });
 
+/* ============================================================
+   초기화
+   ============================================================ */
 applyTheme(getTheme());
 
 window.addEventListener('load', () => {
@@ -924,6 +1585,8 @@ window.addEventListener('load', () => {
   setInterval(renderTodayDate, 60000);
   renderQuantityFields();
   updateSubmitState();
+
+  // 기본 QR 모드로 시작
   startScanner();
 
   if ('serviceWorker' in navigator) {

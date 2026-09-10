@@ -1,11 +1,17 @@
-const CACHE_NAME = 'qr-msforms-shell-v2';
+const CACHE_NAME = 'qr-msforms-shell-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/vendor/html5-qrcode.min.js'
+  '/vendor/html5-qrcode.min.js',
+  '/vendor/tesseract.min.js',
+  '/vendor/tesseract-worker.min.js',
+  '/vendor/tesseract-core.wasm.js',
+  '/vendor/tesseract-core.wasm',
+  '/vendor/tessdata/kor.traineddata.gz',
+  '/vendor/tessdata/eng.traineddata.gz',
 ];
 
 self.addEventListener('install', (event) => {
