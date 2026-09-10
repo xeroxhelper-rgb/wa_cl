@@ -17,18 +17,37 @@
 <style>
   :root{
     --ink:#12151A;
+    --ink-contrast:#fff;
     --paper:#F6F3ED;
+    --card-bg:#fff;
     --accent:#FF5A2A;
     --accent-ink:#3A1200;
     --ok:#2F9E44;
     --line:#E3DED3;
+    --muted:#8A8371;
+    --muted-soft:#B4AD9C;
+    --muted-2:#5B5647;
+    --tab-track:#EDE8DC;
+    --order-accent:#1F3A5F;
     --mono: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+  }
+  html[data-theme="dark"]{
+    --ink:#EDE9E0;
+    --ink-contrast:#15171B;
+    --paper:#1B1D22;
+    --card-bg:#282A31;
+    --line:#3A3D45;
+    --muted:#9B9690;
+    --muted-soft:#6E7178;
+    --muted-2:#C9C4B8;
+    --tab-track:#33363D;
+    --order-accent:#5B9EE8;
   }
   *{box-sizing:border-box;}
   html,body{
     margin:0; padding:0; height:100%; overflow:hidden;
-    font-family:var(--sans); background:var(--ink); color:var(--ink);
+    font-family:var(--sans); background:#000; color:var(--ink);
     -webkit-tap-highlight-color:transparent;
   }
   #app{
@@ -93,13 +112,13 @@
   .label-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
   .label-row .label{ margin:0; }
   #today-date{
-    font-size:12px; font-weight:600; color:#8A8371;
+    font-size:12px; font-weight:600; color:var(--muted);
     border:none; background:none; padding:2px 0; cursor:pointer;
   }
 
   .label{
     font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-    color:#8A8371; margin:0 0 4px 2px;
+    color:var(--muted); margin:0 0 4px 2px;
   }
   .label.label-lg{
     font-size:16px; font-weight:700; letter-spacing:0; text-transform:none;
@@ -113,7 +132,7 @@
   }
 
   #scanned-card{
-    border:1.5px solid var(--line); background:#fff; border-radius:10px;
+    border:1.5px solid var(--line); background:var(--card-bg); border-radius:10px;
     padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
   }
   #scanned-card.filled{ border-color:var(--ok); background:#F1FAF3; }
@@ -121,28 +140,28 @@
     font-family:var(--mono); font-size:15px; font-weight:600; color:var(--ink);
     word-break:break-all; line-height:1.3;
   }
-  #scanned-value.placeholder{ color:#B4AD9C; font-family:var(--sans); font-weight:500; font-size:14px; }
+  #scanned-value.placeholder{ color:var(--muted-soft); font-family:var(--sans); font-weight:500; font-size:14px; }
   #clear-scan{
-    flex:0 0 auto; border:none; background:none; color:#B4AD9C; font-size:20px;
+    flex:0 0 auto; border:none; background:none; color:var(--muted-soft); font-size:20px;
     line-height:1; padding:4px 6px; cursor:pointer;
   }
   #scanned-card.filled #clear-scan{ color:#7CBE8A; }
 
   #quantity-fields{ display:flex; flex-direction:column; gap:10px; }
 
-  .qty-group{ --group-accent: var(--ink); --group-bg: transparent; }
+  .qty-group{ --group-accent: var(--ink); --group-bg: transparent; --group-label-color: var(--ink); }
   .qty-group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
   .qty-group-header .label{
-    margin:0; color:var(--group-accent); background:var(--group-bg);
+    margin:0; color:var(--group-label-color); background:var(--group-bg);
     padding:4px 10px; border-radius:8px;
   }
 
-  .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:#EDE8DC; border-radius:999px; padding:4px; }
+  .tab-switch{ flex:0 0 auto; display:flex; gap:4px; background:var(--tab-track); border-radius:999px; padding:4px; }
   .tab-btn{
-    border:none; background:transparent; color:#8A8371; font-size:16px; font-weight:700;
+    border:none; background:transparent; color:var(--muted); font-size:16px; font-weight:700;
     padding:6px 14px; border-radius:999px; cursor:pointer; white-space:nowrap;
   }
-  .tab-btn.active{ background:var(--group-accent); color:#fff; }
+  .tab-btn.active{ background:var(--group-accent); color:var(--ink-contrast); }
 
   .group-arrow{
     display:flex; justify-content:center; align-items:center;
@@ -156,15 +175,15 @@
   }
   .quick-btn{
     flex:0 0 auto; width:42px; height:42px; padding:0;
-    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border:1.5px solid var(--line); background:var(--card-bg); color:var(--ink);
     border-radius:50%; font-size:15px; font-weight:700;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; user-select:none;
   }
-  .quick-btn.selected{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .quick-btn.selected{ background:var(--ink); border-color:var(--ink); color:var(--ink-contrast); }
 
   #text-input{
-    width:100%; border:1.5px solid var(--line); background:#fff; border-radius:10px;
+    width:100%; border:1.5px solid var(--line); background:var(--card-bg); border-radius:10px;
     padding:10px 12px; font-size:15px; font-family:var(--sans); color:var(--ink);
   }
   #text-input:focus{ outline:none; border-color:var(--ink); }
@@ -190,7 +209,7 @@
 
   #toast{
     position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
-    background:var(--ink); color:#fff; padding:12px 16px; border-radius:10px;
+    background:#12151A; color:#fff; padding:12px 16px; border-radius:10px;
     font-size:14px; text-align:center; opacity:0; pointer-events:none;
     transform:translateY(8px); transition:opacity .2s ease, transform .2s ease;
     z-index:50;
@@ -208,17 +227,30 @@
   }
   .modal-overlay.show{ display:flex; }
   .modal-card{
-    background:#fff; border-radius:14px; padding:22px 20px; max-width:320px; width:100%;
+    background:var(--card-bg); border-radius:14px; padding:22px 20px; max-width:320px; width:100%;
     text-align:center;
   }
   .modal-title{ font-size:16px; font-weight:700; color:var(--ink); margin-bottom:8px; }
-  .modal-body{ font-size:14px; color:#5B5647; line-height:1.5; margin-bottom:18px; }
-  .modal-card input{
-    width:100%; border:1.5px solid var(--line); border-radius:10px;
-    padding:10px 12px; font-size:15px; text-align:center; margin-bottom:14px;
-    font-family:var(--sans); color:var(--ink);
+  .modal-body{ font-size:14px; color:var(--muted-2); line-height:1.5; margin-bottom:18px; }
+  .device-id-box{
+    font-family:var(--mono); font-size:14px; font-weight:700; color:var(--ink);
+    border:1.5px solid var(--line); border-radius:10px; padding:10px 12px;
+    margin-bottom:14px; word-break:break-all; background:var(--paper); cursor:pointer;
   }
-  .modal-card input:focus{ outline:none; border-color:var(--ink); }
+  .settings-row{ display:flex; align-items:center; justify-content:space-between; margin:16px 0; }
+  .settings-row-label{ font-size:15px; font-weight:600; color:var(--ink); }
+  .switch{ position:relative; display:inline-block; width:46px; height:26px; flex:0 0 auto; }
+  .switch input{ position:absolute; opacity:0; width:0; height:0; }
+  .switch-slider{
+    position:absolute; inset:0; background:var(--line); cursor:pointer;
+    transition:.2s; border-radius:999px;
+  }
+  .switch-slider::before{
+    content:""; position:absolute; height:20px; width:20px; left:3px; bottom:3px;
+    background:#fff; transition:.2s; border-radius:50%;
+  }
+  .switch input:checked + .switch-slider{ background:var(--accent); }
+  .switch input:checked + .switch-slider::before{ transform:translateX(20px); }
   .modal-confirm-btn{
     width:100%; border:none; border-radius:10px; background:var(--accent); color:#fff;
     font-size:15px; font-weight:700; padding:12px; cursor:pointer;
@@ -235,8 +267,8 @@
     flex:0 0 auto; font-family:var(--mono); font-size:13px; font-weight:700;
     color:var(--ink); padding-top:1px;
   }
-  .history-detail{ flex:1 1 auto; font-size:13px; color:#5B5647; line-height:1.5; word-break:break-all; }
-  .history-empty{ text-align:center; color:#8A8371; font-size:14px; padding:20px 0; }
+  .history-detail{ flex:1 1 auto; font-size:13px; color:var(--muted-2); line-height:1.5; word-break:break-all; }
+  .history-empty{ text-align:center; color:var(--muted); font-size:14px; padding:20px 0; }
 </style>
 </head>
 <body>
@@ -301,10 +333,17 @@
 
 <div id="settings-modal" class="modal-overlay">
   <div class="modal-card">
-    <div class="modal-title">내 전화번호 등록</div>
-    <div class="modal-body">전송 시 QR 스캔 값과 함께 전달되어 담당자를 구분하는 데 사용됩니다.</div>
-    <input id="phone-input" type="tel" placeholder="010-1234-5678" />
-    <button id="settings-save-btn" type="button" class="modal-confirm-btn">저장</button>
+    <div class="modal-title">설정</div>
+    <div class="modal-body">기기 고유 번호는 전송 시 QR 스캔 값과 함께 전달되어 담당자(기기)를 구분하는 데 사용됩니다. 개인정보는 수집하지 않으며, 이 기기 안에서 자동으로 발급된 번호입니다.</div>
+    <div id="device-id-display" class="device-id-box" title="눌러서 복사"></div>
+    <div class="settings-row">
+      <span class="settings-row-label">다크 모드</span>
+      <label class="switch">
+        <input type="checkbox" id="dark-mode-toggle">
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <button id="settings-close-btn" type="button" class="modal-confirm-btn">확인</button>
   </div>
 </div>
 
@@ -325,7 +364,7 @@ const CONFIG = {
   // 1) Microsoft Forms에서 "미리 채워진 링크(Get Pre-filled link)"로 생성한 URL을 붙여넣으세요.
   //    링크를 만들 때 각 문항에는 아래 PLACEHOLDER 문자열을 그대로 입력해서 생성하면,
   //    이 코드가 문항 파라미터명을 몰라도 문자열 치환만으로 값을 채울 수 있습니다.
-  MS_FORMS_TEMPLATE_URL: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=hTfGPKK40UG8RH2Kj_o9bnwRZnTmg9hAjZ0tvYsLBy9UOUlHNEJHVFM1MlpOSzMxUVU0ODZGS1RRUC4u&r4a28f38cdf1f41f99e4864aaa9ee2ba8=QR_VALUE_HERE&&rbd4498299293499181f6d7490da14e96=ORDER_QTY_HERE&rdd4db81f726a452abe98d4b79795b3db=RECOVERY_QTY_HERE",
+  MS_FORMS_TEMPLATE_URL: "",
 
   PLACEHOLDER_QR: "QR_VALUE_HERE",
   PLACEHOLDER_TEXT: "TEXT_VALUE_HERE",
@@ -345,7 +384,8 @@ const CONFIG = {
       key: "order",
       label: "소모품 주문 수량",
       placeholder: "ORDER_QTY_HERE",
-      accentColor: "#1F3A5F",
+      accentColor: "var(--order-accent)",
+      labelColor: "#1F3A5F",
       bgColor: "#E6ECF4",
       tabs: [
         { key: "tonerOrder", tabLabel: "Toner", max: 10 },
@@ -357,6 +397,7 @@ const CONFIG = {
       label: "폐소모품 회수 수량",
       placeholder: "RECOVERY_QTY_HERE",
       accentColor: "var(--accent)",
+      labelColor: "var(--accent)",
       bgColor: "#FFE9DE",
       tabs: [
         { key: "tonerRecovery", tabLabel: "Toner", max: 10 },
@@ -377,6 +418,7 @@ let scannedValue = "";
 const quantityState = {};
 let html5QrCode = null;
 let isPaused = false;
+let awaitingFormsReturn = false;
 
 const els = {
   scannedValue: document.getElementById('scanned-value'),
@@ -394,8 +436,9 @@ const els = {
   todayDate: document.getElementById('today-date'),
   settingsBtn: document.getElementById('settings-btn'),
   settingsModal: document.getElementById('settings-modal'),
-  phoneInput: document.getElementById('phone-input'),
-  settingsSaveBtn: document.getElementById('settings-save-btn'),
+  deviceIdDisplay: document.getElementById('device-id-display'),
+  darkModeToggle: document.getElementById('dark-mode-toggle'),
+  settingsCloseBtn: document.getElementById('settings-close-btn'),
   historyModal: document.getElementById('history-modal'),
   historyList: document.getElementById('history-list'),
   historyCloseBtn: document.getElementById('history-close-btn')
@@ -409,7 +452,8 @@ function showToast(msg, ms = 2200) {
 }
 
 const HISTORY_KEY = 'qrMsforms.history';
-const PHONE_KEY = 'qrMsforms.phone';
+const DEVICE_ID_KEY = 'qrMsforms.deviceId';
+const THEME_KEY = 'qrMsforms.theme';
 
 function todayKey() {
   const now = new Date();
@@ -466,16 +510,51 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function getRegisteredPhone() {
-  try { return localStorage.getItem(PHONE_KEY) || ""; } catch (e) { return ""; }
+function generateId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  // 구형 브라우저 대비 폴백 (crypto.randomUUID 미지원 시)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
-function setRegisteredPhone(v) {
-  try { localStorage.setItem(PHONE_KEY, v); } catch (e) {}
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = generateId();
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch (e) {
+    return '';
+  }
+}
+
+function getTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
+}
+
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#1B1D22' : '#12151A');
+}
+
+function setTheme(theme) {
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  applyTheme(theme);
 }
 
 function openSettingsModal() {
-  els.phoneInput.value = getRegisteredPhone();
+  els.deviceIdDisplay.textContent = getDeviceId();
+  els.darkModeToggle.checked = (getTheme() === 'dark');
   els.settingsModal.classList.add('show');
 }
 
@@ -521,6 +600,7 @@ function renderTabGroup(group) {
   wrap.className = 'qty-group';
   wrap.style.setProperty('--group-accent', group.accentColor || 'var(--ink)');
   wrap.style.setProperty('--group-bg', group.bgColor || 'transparent');
+  wrap.style.setProperty('--group-label-color', group.labelColor || group.accentColor || 'var(--ink)');
 
   const header = document.createElement('div');
   header.className = 'qty-group-header';
@@ -691,8 +771,8 @@ function startScanner() {
 
 function buildFormsUrl() {
   const textVal = els.textInput.value || "";
-  const phone = getRegisteredPhone();
-  const qrCombined = phone ? `${scannedValue} / ${phone}` : scannedValue;
+  const deviceId = getDeviceId();
+  const qrCombined = deviceId ? `${scannedValue} / ${deviceId}` : scannedValue;
 
   let url = CONFIG.MS_FORMS_TEMPLATE_URL;
   url = url.split(CONFIG.PLACEHOLDER_QR).join(encodeURIComponent(qrCombined));
@@ -734,6 +814,7 @@ function hideOfflineModal() {
 function proceedToForms() {
   const url = buildFormsUrl();
   recordHistoryEntry();
+  awaitingFormsReturn = true;
 
 //  if (CONFIG.FORCE_DEFAULT_BROWSER_ON_ANDROID && isAndroid()) {
 //    window.location.href = buildAndroidIntentUrl(url);
@@ -777,10 +858,15 @@ els.offlineModalConfirm.addEventListener('click', () => {
 });
 
 els.settingsBtn.addEventListener('click', openSettingsModal);
-els.settingsSaveBtn.addEventListener('click', () => {
-  setRegisteredPhone(els.phoneInput.value.trim());
-  closeSettingsModal();
-  showToast('전화번호가 저장되었습니다.');
+els.settingsCloseBtn.addEventListener('click', closeSettingsModal);
+els.deviceIdDisplay.addEventListener('click', () => {
+  const id = getDeviceId();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(id).then(() => showToast('복사되었습니다.'));
+  }
+});
+els.darkModeToggle.addEventListener('change', () => {
+  setTheme(els.darkModeToggle.checked ? 'dark' : 'light');
 });
 els.settingsModal.addEventListener('click', (e) => {
   if (e.target === els.settingsModal) closeSettingsModal();
@@ -792,10 +878,30 @@ els.historyModal.addEventListener('click', (e) => {
   if (e.target === els.historyModal) closeHistoryModal();
 });
 
-// 새 탭에서 돌아왔을 때(iOS 등) 카메라가 멈춰 있으면 재개
+// MS Forms로 이동했다가 돌아왔을 때(탭 전환/뒤로가기 등 어떤 경로든) 반드시 초기화되도록
+// proceedToForms()에서 세팅하는 플래그를 여기서 확인합니다.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') resumeScanner();
+  if (document.visibilityState === 'visible') {
+    resumeScanner();
+    if (awaitingFormsReturn) {
+      awaitingFormsReturn = false;
+      resetScanState();
+      renderTodayDate();
+    }
+  }
 });
+
+// location.href로 이동했다가 브라우저 "뒤로가기"로 돌아온 경우(bfcache 복원) 대비
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    awaitingFormsReturn = false;
+    resetScanState();
+    resumeScanner();
+    renderTodayDate();
+  }
+});
+
+applyTheme(getTheme());
 
 window.addEventListener('load', () => {
   if (!CONFIG.MS_FORMS_TEMPLATE_URL) {
@@ -806,10 +912,6 @@ window.addEventListener('load', () => {
   renderQuantityFields();
   updateSubmitState();
   startScanner();
-
-  if (!getRegisteredPhone()) {
-    openSettingsModal();
-  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
